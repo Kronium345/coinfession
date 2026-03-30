@@ -1,11 +1,13 @@
 import { Link } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "twrnc";
 import { colors, fonts } from "../../theme";
 
+
 export default function App() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={tw`flex-1 items-center justify-center bg-background`}>
       <Text style={styles.title}>Welcome to twrnc!</Text>
       <Text style={styles.subtitle}>
         Using design tokens from theme.js
@@ -18,15 +20,11 @@ export default function App() {
         pathname: "/subscriptions/[id]",
         params: { id: "claude" },
       }} style={styles.link}>Claude Subscription</Link>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    ...tw`flex-1 items-center justify-center`,
-    backgroundColor: colors.background,
-  },
   title: {
     ...tw`text-2xl`,
     color: colors.success,

@@ -1,11 +1,13 @@
-import React from 'react'
-import { Text, View } from 'react-native'
+import React from 'react';
+import { Text } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
+import tw from "twrnc";
 
 const subscriptions = () => {
     return (
-        <View>
+        <SafeAreaView style={tw`flex-1 p-5 items-center justify-center bg-background`}>
             <Text>subscriptions</Text>
-        </View>
+        </SafeAreaView>
     )
 }
 
