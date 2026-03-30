@@ -1,31 +1,13 @@
 import { tabs } from "@/constants/data";
 import { colours, components } from "@/constants/theme";
-import clsx from "clsx";
+import { cx } from "@/lib/tw";
 import { Tabs } from "expo-router";
 import { Image, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import tw from "twrnc";
-import { colors } from "../../theme";
 
 type TabIconProps = {
     focused: boolean;
     icon: any;
-};
-
-const classMap = {
-    "tabs-icon": tw.style("h-12 w-12 items-center justify-center"),
-    "tabs-pill": {
-        ...tw.style("h-12 w-12 items-center justify-center rounded-full"),
-        backgroundColor: "transparent",
-    },
-    "tabs-active": { backgroundColor: colors.accent },
-    "tabs-glyph": tw.style("h-6 w-6"),
-};
-
-const cx = (...inputs: Array<string | false | null | undefined>) => {
-    const tokens = clsx(inputs).split(" ").filter(Boolean);
-    const resolved = tokens.map((token) => classMap[token as keyof typeof classMap] ?? tw.style(token));
-    return tw.style(...resolved);
 };
 
 const tabBar = components.tabBar;
