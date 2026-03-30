@@ -8,27 +8,20 @@ import { colors, fonts } from "../../theme";
 export default function App() {
   return (
     <SafeAreaView style={tw`flex-1 items-center justify-center bg-background`}>
-      <Text style={styles.title}>Welcome to twrnc!</Text>
-      <Text style={styles.subtitle}>
-        Using design tokens from theme.js
-      </Text>
+      <Text style={styles.title}>Home</Text>
+
 
       <Link href="/(auth)/sign-in" style={styles.link}>Sign In</Link>
       <Link href="/(auth)/sign-up" style={styles.link}>Sign Up</Link>
-      <Link href="/subscriptions/spotify" style={styles.link}>Spotify Subscription</Link>
-      <Link href={{
-        pathname: "/subscriptions/[id]",
-        params: { id: "claude" },
-      }} style={styles.link}>Claude Subscription</Link>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   title: {
-    ...tw`text-2xl`,
+    ...tw`text-5xl`,
     color: colors.success,
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sansExtrabold,
   },
   subtitle: {
     ...tw`mt-2 text-base`,
@@ -38,7 +31,7 @@ const styles = StyleSheet.create({
   link: {
     ...tw`text-white`,
     backgroundColor: colors.primary,
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sansBold,
     marginTop: 4,
     borderRadius: 4,
     padding: 4,
