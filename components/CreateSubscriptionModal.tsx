@@ -44,7 +44,7 @@ const CATEGORY_COLORS: Record<Category, string> = {
 type CreateSubscriptionModalProps = {
   visible: boolean;
   onClose: () => void;
-  onCreate: (subscription: Subscription) => void;
+  onCreate: (subscription: Subscription) => Promise<void>;
 };
 
 function tokensFromClsx(...args: Parameters<typeof clsx>) {
@@ -86,7 +86,7 @@ export default function CreateSubscriptionModal({
   const canSubmit =
     name.trim().length > 0 && Number.isFinite(priceNumber) && priceNumber > 0;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setSubmitError(null);
     if (!name.trim()) {
       setSubmitError("Enter a subscription name.");
@@ -120,15 +120,19 @@ export default function CreateSubscriptionModal({
       color: CATEGORY_COLORS[category],
     };
 
-    onCreate(subscription);
-    posthog.capture("subscription_created", {
-      subscription_name: subscription.name,
-      subscription_price: subscription.price,
-      subscription_frequency: subscription.billing,
-      subscription_category: subscription.category ?? "Other",
-    });
-    reset();
-    onClose();
+    try {
+      await onCreate(subscription);
+      posthog.capture("subscription_created", {
+        subscription_name: subscription.name,
+        subscription_price: subscription.price,
+        subscription_frequency: subscription.billing,
+        subscription_category: subscription.category ?? "Other",
+      });
+      reset();
+      onClose();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to create subscription.");
+    }
   };
 
   return (

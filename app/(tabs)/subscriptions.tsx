@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../theme";
 
 export default function SubscriptionsScreen() {
-  const { subscriptions } = useSubscriptions();
+  const { subscriptions, isLoading, syncError } = useSubscriptions();
   const [query, setQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
     string | null
@@ -77,6 +77,12 @@ export default function SubscriptionsScreen() {
                 ? "No subscriptions match your search."
                 : "No subscriptions yet."}
             </Text>
+          }
+          ListHeaderComponent={
+            <>
+              {isLoading ? <Text style={cx("home-empty-state")}>Syncing subscriptions...</Text> : null}
+              {syncError ? <Text style={cx("home-empty-state")}>{syncError}</Text> : null}
+            </>
           }
           renderItem={({ item }) => (
             <SubscriptionCard

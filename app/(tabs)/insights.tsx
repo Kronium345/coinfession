@@ -1,5 +1,6 @@
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { cx } from "@/lib/tw";
+import { getInsightsSummary, type InsightItem } from "@/lib/api";
 import {
   axisTicks,
   buildHistoryRows,
@@ -11,9 +12,10 @@ import {
 } from "@/lib/insightsMetrics";
 import { formatCurrency } from "@/lib/utils";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Image,
   Pressable,
@@ -30,8 +32,11 @@ const Y_TICK_COUNT = 5;
 
 export default function InsightsScreen() {
   const router = useRouter();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const { subscriptions } = useSubscriptions();
   const [now] = useState(() => dayjs());
+  const [insightItem, setInsightItem] = useState<InsightItem | null>(null);
+  const [insightError, setInsightError] = useState<string | null>(null);
 
   const insightMonth = useMemo(() => now.startOf("month"), [now]);
   const prevMonth = useMemo(() => insightMonth.subtract(1, "month"), [insightMonth]);
@@ -83,6 +88,30 @@ export default function InsightsScreen() {
 
   const goHome = () => router.push("/");
   const goSubscriptions = () => router.push("/subscriptions");
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    let active = true;
+    const load = async () => {
+      try {
+        const summary = await getInsightsSummary(getToken);
+        if (active) {
+          setInsightItem(summary.items[0] ?? null);
+          setInsightError(null);
+        }
+      } catch (error) {
+        if (active) {
+          setInsightError(error instanceof Error ? error.message : "Failed to load insights.");
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [getToken, isLoaded, isSignedIn]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -213,12 +242,16 @@ export default function InsightsScreen() {
 
         <View style={styles.aiCard}>
           <Text style={styles.aiTitle}>Smarter suggestions</Text>
-          <Text style={styles.aiBody}>
-            A future backend could combine a probability matrix (renewal likelihood,
-            price drift, and category overlap) with your real billing history to
-            rank savings opportunities. On-device data alone is not enough for
-            trustworthy scores; this UI is ready to plug results in later.
-          </Text>
+          {insightItem ? (
+            <Text style={styles.aiBody}>
+              {insightItem.band}: {insightItem.description} Suggested action:{" "}
+              {insightItem.suggestion} Top factors: {insightItem.topFactors.join(", ")}.
+            </Text>
+          ) : (
+            <Text style={styles.aiBody}>
+              {insightError ?? "Insights are being prepared from your latest expense patterns."}
+            </Text>
+          )}
         </View>
 
         <View style={styles.sectionHead}>

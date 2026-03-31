@@ -19,7 +19,7 @@ import { colors, fonts } from "../../theme";
 export default function App() {
 
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
-  const { subscriptions, addSubscription } = useSubscriptions();
+  const { subscriptions, addSubscription, isLoading, syncError } = useSubscriptions();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const upcomingSubscriptions = useMemo<UpcomingSubscription[]>(() => {
     const now = dayjs();
@@ -90,6 +90,8 @@ export default function App() {
             </View>
 
             <ListHeading title="All Subscriptions" />
+            {isLoading ? <Text style={cx("home-empty-state")}>Syncing subscriptions...</Text> : null}
+            {syncError ? <Text style={cx("home-empty-state")}>{syncError}</Text> : null}
           </>
         )}
         data={subscriptions}
