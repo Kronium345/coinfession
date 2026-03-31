@@ -1,3 +1,4 @@
+import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
 import { icons } from "./icons";
 
 export const tabs: AppTab[] = [
@@ -19,7 +20,7 @@ export const HOME_BALANCE = {
 export const UPCOMING_SUBSCRIPTIONS: UpcomingSubscription[] = [
     {
         id: "spotify",
-        icon: icons.spotify,
+        icon: resolveSubscriptionIcon("Spotify"),
         name: "Spotify",
         price: 5.99,
         currency: "USD",
@@ -27,7 +28,7 @@ export const UPCOMING_SUBSCRIPTIONS: UpcomingSubscription[] = [
     },
     {
         id: "notion",
-        icon: icons.notion,
+        icon: resolveSubscriptionIcon("Notion"),
         name: "Notion",
         price: 12.0,
         currency: "USD",
@@ -35,7 +36,7 @@ export const UPCOMING_SUBSCRIPTIONS: UpcomingSubscription[] = [
     },
     {
         id: "figma",
-        icon: icons.figma,
+        icon: resolveSubscriptionIcon("Figma"),
         name: "Figma",
         price: 15.0,
         currency: "USD",
@@ -43,10 +44,9 @@ export const UPCOMING_SUBSCRIPTIONS: UpcomingSubscription[] = [
     },
 ];
 
-export const HOME_SUBSCRIPTIONS: Subscription[] = [
+export const HOME_SUBSCRIPTIONS: Omit<Subscription, "icon">[] = [
     {
         id: "adobe-creative-cloud",
-        icon: icons.adobe,
         name: "Adobe Creative Cloud",
         plan: "Teams Plan",
         category: "Design",
@@ -61,7 +61,6 @@ export const HOME_SUBSCRIPTIONS: Subscription[] = [
     },
     {
         id: "github-pro",
-        icon: icons.github,
         name: "GitHub Pro",
         plan: "Developer",
         category: "Developer Tools",
@@ -76,7 +75,6 @@ export const HOME_SUBSCRIPTIONS: Subscription[] = [
     },
     {
         id: "claude-pro",
-        icon: icons.claude,
         name: "Claude Pro",
         plan: "Pro Plan",
         category: "AI Tools",
@@ -91,7 +89,6 @@ export const HOME_SUBSCRIPTIONS: Subscription[] = [
     },
     {
         id: "canva-pro",
-        icon: icons.canva,
         name: "Canva Pro",
         plan: "Yearly Access",
         category: "Design",

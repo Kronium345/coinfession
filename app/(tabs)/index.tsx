@@ -1,18 +1,19 @@
+import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubsCard from "@/components/UpcomingSubsCard";
 import {
   HOME_BALANCE,
-  HOME_SUBSCRIPTIONS,
   HOME_USER,
   UPCOMING_SUBSCRIPTIONS,
 } from "@/constants/data";
+import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import { cx } from "@/lib/tw";
 import { formatCurrency, formatSubscriptionDateTime } from "@/lib/utils";
 import { useState } from "react";
-import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "twrnc";
 import { colors, fonts } from "../../theme";
@@ -21,8 +22,16 @@ import { colors, fonts } from "../../theme";
 export default function App() {
 
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
+  const { subscriptions, addSubscription } = useSubscriptions();
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+
   return (
     <SafeAreaView style={[tw`flex-1 px-5 pt-2`, { backgroundColor: colors.background }]}>
+      <CreateSubscriptionModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onCreate={addSubscription}
+      />
       <FlatList
         ListHeaderComponent={() => (
           <>
@@ -31,7 +40,13 @@ export default function App() {
                 <Image source={images.avatar} style={cx("home-avatar")} />
                 <Text style={cx("home-user-name")}>{HOME_USER.name}</Text>
               </View>
-              <Image source={icons.add} style={cx("home-add-icon")} />
+              <Pressable
+                onPress={() => setCreateModalVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Add subscription"
+              >
+                <Image source={icons.add} style={cx("home-add-icon")} />
+              </Pressable>
             </View>
 
             <View style={cx("home-balance-card")}>
@@ -57,7 +72,7 @@ export default function App() {
             <ListHeading title="All Subscriptions" />
           </>
         )}
-        data={HOME_SUBSCRIPTIONS}
+        data={subscriptions}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) =>
           <SubscriptionCard
@@ -65,7 +80,7 @@ export default function App() {
             expanded={expandedSubscriptionId === item.id}
             onPress={() => { setExpandedSubscriptionId((currentId) => (currentId === item.id ? null : item.id)); }}
           />}
-        extraData={expandedSubscriptionId}
+        extraData={{ expandedSubscriptionId, count: subscriptions.length }}
         ItemSeparatorComponent={() => <View style={cx("h-4")} />}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<Text style={cx("home-empty-state")}>No subscriptions yet.</Text>}

@@ -1,3 +1,4 @@
+import { SubscriptionsProvider } from "@/context/SubscriptionsContext";
 import { useAuth } from "@clerk/expo";
 import { tabs } from "@/constants/data";
 import { colours, components } from "@/constants/theme";
@@ -34,7 +35,9 @@ const TabsLayout = () => {
             </View>
         )
     }
-    return (<Tabs screenOptions={{
+    return (
+    <SubscriptionsProvider>
+    <Tabs screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
@@ -68,6 +71,7 @@ const TabsLayout = () => {
                 }} />
         ))}
     </Tabs>
+    </SubscriptionsProvider>
     );
 }
 
