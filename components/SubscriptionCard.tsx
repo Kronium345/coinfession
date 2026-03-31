@@ -1,19 +1,28 @@
 import { cx } from '@/lib/tw';
 import { formatCurrency, formatSubscriptionDateTime } from '@/lib/utils';
 import React from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 
-type SubscriptionCardInput = SubscriptionCardProps | ({ data: Subscription } & Pick<SubscriptionCardProps, "expanded" | "onPress" | "onCancelPress" | "isCancelling">);
+type ExplicitProps = SubscriptionCardProps;
+type DataWrapperProps = {
+    data: Subscription;
+} & Pick<SubscriptionCardProps, "expanded" | "onPress" | "onCancelPress" | "isCancelling">;
+
+type SubscriptionCardInput = ExplicitProps | DataWrapperProps;
 
 const SubscriptionCard = (props: SubscriptionCardInput) => {
-    const record = "data" in props ? props.data : props;
-    const { name, price, currency, icon, billing, color, category, plan, renewalDate } = record;
+    const base = "data" in props ? props.data : props;
+    const { name, price, currency, icon, billing, color, category, plan, renewalDate } = base;
+    const { onPress, expanded } = props;
 
     return (
-        <View style={[
-            cx("sub-card", !color && "bg-card"),
-            color ? { backgroundColor: color } : undefined,
-        ]}>
+        <Pressable
+            onPress={onPress}
+            style={[
+                cx("sub-card", expanded ? "sub-card-expanded" : "bg-card"),
+                expanded && color ? { backgroundColor: color } : undefined,
+            ]}
+        >
             <View style={cx("sub-head")}>
                 <View style={cx("sub-main")}>
                     <Image source={icon} style={cx("sub-icon")} />
@@ -29,7 +38,7 @@ const SubscriptionCard = (props: SubscriptionCardInput) => {
                     <Text style={cx("sub-billing")}>{billing}</Text>
                 </View>
             </View>
-        </View>
+        </Pressable>
     )
 }
 

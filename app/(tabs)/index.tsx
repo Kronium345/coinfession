@@ -6,6 +6,7 @@ import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import { cx } from "@/lib/tw";
 import { formatCurrency, formatSubscriptionDateTime } from "@/lib/utils";
+import { useState } from "react";
 import { FlatList, Image, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "twrnc";
@@ -13,6 +14,8 @@ import { colors, fonts } from "../../theme";
 
 
 export default function App() {
+
+  const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
   return (
     <SafeAreaView style={[tw`flex-1 px-5 pt-2`, { backgroundColor: colors.background }]}>
       <View style={cx("home-header")}>
@@ -43,9 +46,9 @@ export default function App() {
       <View>
         <ListHeading title="All Subscriptions" />
         <SubscriptionCard
+          expanded={expandedSubscriptionId === HOME_SUBSCRIPTIONS[0].id}
           data={HOME_SUBSCRIPTIONS[0]}
-          expanded={false}
-          onPress={() => {}}
+          onPress={() => { setExpandedSubscriptionId((currentId) => (currentId === HOME_SUBSCRIPTIONS[0].id ? null : HOME_SUBSCRIPTIONS[0].id)); }}
         />
       </View>
     </SafeAreaView>
