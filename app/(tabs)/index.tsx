@@ -2,17 +2,14 @@ import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubsCard from "@/components/UpcomingSubsCard";
-import {
-  HOME_BALANCE,
-  HOME_USER,
-  UPCOMING_SUBSCRIPTIONS,
-} from "@/constants/data";
+import { HOME_BALANCE, HOME_USER } from "@/constants/data";
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import { cx } from "@/lib/tw";
 import { formatCurrency, formatSubscriptionDateTime } from "@/lib/utils";
-import { useState } from "react";
+import dayjs from "dayjs";
+import { useMemo, useState } from "react";
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import tw from "twrnc";
@@ -24,6 +21,29 @@ export default function App() {
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
   const { subscriptions, addSubscription } = useSubscriptions();
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const upcomingSubscriptions = useMemo<UpcomingSubscription[]>(() => {
+    const now = dayjs();
+
+    return subscriptions
+      .filter((sub) => Boolean(sub.renewalDate))
+      .map((sub) => {
+        const renewal = dayjs(sub.renewalDate);
+        const daysLeft = Math.max(0, renewal.startOf("day").diff(now.startOf("day"), "day"));
+        return {
+          id: sub.id,
+          icon: sub.icon,
+          name: sub.name,
+          price: sub.price,
+          currency: sub.currency ?? "USD",
+          daysLeft,
+          renewalTs: renewal.valueOf(),
+        };
+      })
+      .filter((sub) => Number.isFinite(sub.renewalTs))
+      .sort((a, b) => a.renewalTs - b.renewalTs)
+      .slice(0, 6)
+      .map(({ renewalTs, ...sub }) => sub);
+  }, [subscriptions]);
 
   return (
     <SafeAreaView style={[tw`flex-1 px-5 pt-2`, { backgroundColor: colors.background }]}>
@@ -60,7 +80,7 @@ export default function App() {
             <View style={cx("mb-5")}>
               <ListHeading title="Upcoming" />
               <FlatList
-                data={UPCOMING_SUBSCRIPTIONS}
+                data={upcomingSubscriptions}
                 renderItem={({ item }) => <UpcomingSubsCard {...item} />}
                 keyExtractor={(item) => item.id}
                 horizontal
