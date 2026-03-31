@@ -1,5 +1,5 @@
 import { cx } from '@/lib/tw';
-import { formatCurrency, formatSubscriptionDateTime } from '@/lib/utils';
+import { formatCurrency, formatStatusLabel, formatSubscriptionDateTime } from '@/lib/utils';
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
@@ -12,7 +12,7 @@ type SubscriptionCardInput = ExplicitProps | DataWrapperProps;
 
 const SubscriptionCard = (props: SubscriptionCardInput) => {
     const base = "data" in props ? props.data : props;
-    const { name, price, currency, icon, billing, color, category, plan, renewalDate } = base;
+    const { name, price, currency, icon, billing, color, category, plan, renewalDate, paymentMethod, startDate, status } = base;
     const { onPress, expanded } = props;
 
     return (
@@ -38,6 +38,43 @@ const SubscriptionCard = (props: SubscriptionCardInput) => {
                     <Text style={cx("sub-billing")}>{billing}</Text>
                 </View>
             </View>
+
+            {expanded && (
+                <View style={cx("sub-body")}>
+                    <View style={cx("sub-details")}>
+                        <View style={cx("sub-row")}>
+                            <View style={cx("sub-row-copy")}>
+                                <Text style={cx("sub-label")}>Payment:</Text>
+                                <Text style={cx("sub-value")} numberOfLines={1} ellipsizeMode='tail'>{paymentMethod?.trim() || 'Not provided'}</Text>
+                            </View>
+                        </View>
+                        <View style={cx("sub-row")}>
+                            <View style={cx("sub-row-copy")}>
+                                <Text style={cx("sub-label")}>Category:</Text>
+                                <Text style={cx("sub-value")} numberOfLines={1} ellipsizeMode='tail'>{category?.trim() || plan?.trim() || 'Not provided'}</Text>
+                            </View>
+                        </View>
+                        <View style={cx("sub-row")}>
+                            <View style={cx("sub-row-copy")}>
+                                <Text style={cx("sub-label")}>Started:</Text>
+                                <Text style={cx("sub-value")} numberOfLines={1} ellipsizeMode='tail'>{startDate ? formatSubscriptionDateTime(startDate) : ''}</Text>
+                            </View>
+                        </View>
+                        <View style={cx("sub-row")}>
+                            <View style={cx("sub-row-copy")}>
+                                <Text style={cx("sub-label")}>Renewal Date:</Text>
+                                <Text style={cx("sub-value")} numberOfLines={1} ellipsizeMode='tail'>{renewalDate ? formatSubscriptionDateTime(renewalDate) : ''}</Text>
+                            </View>
+                        </View>
+                        <View style={cx("sub-row")}>
+                            <View style={cx("sub-row-copy")}>
+                                <Text style={cx("sub-label")}>Status:</Text>
+                                <Text style={cx("sub-value")} numberOfLines={1} ellipsizeMode='tail'>{status ? formatStatusLabel(status) : ''}</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            )}
         </Pressable>
     )
 }
