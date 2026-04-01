@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -26,6 +27,8 @@ const SubscriptionsContext = createContext<SubscriptionsContextValue | null>(
 
 export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn, isLoaded } = useAuth();
+  const getTokenRef = useRef(getToken);
+  const hasBootstrappedRef = useRef(false);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(() =>
     HOME_SUBSCRIPTIONS.map((s) => ({
       ...s,
@@ -34,6 +37,10 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const mapApiSubscription = useCallback((item: ApiSubscription): Subscription => {
     return {
@@ -56,7 +63,7 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   const refreshSubscriptions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const remote = await listSubscriptions(getToken);
+      const remote = await listSubscriptions(getTokenRef.current);
       setSubscriptions(remote.map(mapApiSubscription));
       setSyncError(null);
     } catch (error) {
@@ -64,10 +71,16 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken, mapApiSubscription]);
+  }, [mapApiSubscription]);
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      hasBootstrappedRef.current = false;
+      return;
+    }
+    if (hasBootstrappedRef.current) return;
+    hasBootstrappedRef.current = true;
     void refreshSubscriptions();
   }, [isLoaded, isSignedIn, refreshSubscriptions]);
 
@@ -87,10 +100,10 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
         color: subscription.color ?? null,
       };
 
-      const created = await createSubscription(getToken, payload);
+      const created = await createSubscription(getTokenRef.current, payload);
       setSubscriptions((prev) => [mapApiSubscription(created), ...prev]);
     },
-    [getToken, mapApiSubscription]
+    [mapApiSubscription]
   );
 
   const value = useMemo(

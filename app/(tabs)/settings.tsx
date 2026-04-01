@@ -3,7 +3,7 @@ import { cx } from "@/lib/tw";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,6 +16,8 @@ export default function SettingsScreen() {
   const { signOut } = useClerk();
   const { user } = useUser();
   const { getToken } = useAuth();
+  const getTokenRef = useRef(getToken);
+  const hasBootstrappedRef = useRef(false);
   const posthog = usePostHog();
   const { startLink, busy: plaidBusy, error: plaidError, clearError } = usePlaidLink();
   const [connections, setConnections] = useState<BankConnection[]>([]);
@@ -23,19 +25,25 @@ export default function SettingsScreen() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
   const refreshConnections = useCallback(async () => {
     setLoadingConnections(true);
     try {
-      const rows = await listBankConnections(getToken);
+      const rows = await listBankConnections(getTokenRef.current);
       setConnections(rows);
     } catch {
       setConnections([]);
     } finally {
       setLoadingConnections(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
+    if (hasBootstrappedRef.current) return;
+    hasBootstrappedRef.current = true;
     void refreshConnections();
   }, [refreshConnections]);
 
@@ -63,7 +71,7 @@ export default function SettingsScreen() {
     setSyncBusy(true);
     setSyncMessage(null);
     try {
-      const result = await syncBankTransactions(getToken);
+      const result = await syncBankTransactions(getTokenRef.current);
       const detail = result.results
         .map((r) =>
           r.ok

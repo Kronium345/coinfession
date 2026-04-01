@@ -2,12 +2,13 @@ import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubsCard from "@/components/UpcomingSubsCard";
-import { HOME_BALANCE, HOME_USER } from "@/constants/data";
+import { HOME_BALANCE } from "@/constants/data";
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import { cx } from "@/lib/tw";
 import { formatCurrency, formatSubscriptionDateTime } from "@/lib/utils";
+import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
@@ -20,6 +21,7 @@ export default function App() {
 
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
   const { subscriptions, addSubscription, isLoading, syncError } = useSubscriptions();
+  const { user } = useUser();
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const upcomingSubscriptions = useMemo<UpcomingSubscription[]>(() => {
     const now = dayjs();
@@ -57,8 +59,16 @@ export default function App() {
           <>
             <View style={cx("home-header")}>
               <View style={cx("home-user")}>
-                <Image source={images.avatar} style={cx("home-avatar")} />
-                <Text style={cx("home-user-name")}>{HOME_USER.name}</Text>
+                <Image
+                  source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
+                  style={cx("home-avatar")}
+                />
+                <Text style={cx("home-user-name")}>
+                  {user?.firstName?.trim() ||
+                    user?.username ||
+                    user?.primaryEmailAddress?.emailAddress ||
+                    "Welcome"}
+                </Text>
               </View>
               <Pressable
                 onPress={() => setCreateModalVisible(true)}

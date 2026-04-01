@@ -27,6 +27,8 @@ export default function SignUpScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [localEmailError, setLocalEmailError] = useState<string | null>(null);
@@ -66,6 +68,8 @@ export default function SignUpScreen() {
     const { error } = await signUp.password({
       emailAddress: email.trim(),
       password,
+      firstName: firstName.trim() || undefined,
+      lastName: lastName.trim() || undefined,
     });
     if (error) {
       return;
@@ -120,11 +124,13 @@ export default function SignUpScreen() {
 
   const canStart = useMemo(() => {
     return (
+      firstName.trim().length > 0 &&
+      lastName.trim().length > 0 &&
       email.trim().length > 0 &&
       password.length >= PASSWORD_MIN_LENGTH &&
       !busy
     );
-  }, [email, password, busy]);
+  }, [firstName, lastName, email, password, busy]);
 
   if (awaitingEmailCode) {
     return (
@@ -208,6 +214,28 @@ export default function SignUpScreen() {
           <View style={cx("auth-card")}>
             <View nativeID="clerk-captcha" />
             <View style={cx("auth-form")}>
+              <View style={cx("auth-field")}>
+                <Text style={cx("auth-label")}>First name</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  placeholder="First name"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={cx("auth-input")}
+                />
+              </View>
+              <View style={cx("auth-field")}>
+                <Text style={cx("auth-label")}>Last name</Text>
+                <TextInput
+                  autoCapitalize="words"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  placeholder="Last name"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={cx("auth-input")}
+                />
+              </View>
               <View style={cx("auth-field")}>
                 <Text style={cx("auth-label")}>Email</Text>
                 <TextInput
