@@ -1,13 +1,43 @@
+import { listBankConnections, syncBankTransactions, type BankConnection } from "@/lib/api";
 import { cx } from "@/lib/tw";
-import { useClerk, useUser } from "@clerk/expo";
+import { usePlaidLink } from "@/hooks/usePlaidLink";
+import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
-import { Pressable, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 export default function SettingsScreen() {
   const { signOut } = useClerk();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const posthog = usePostHog();
+  const { startLink, busy: plaidBusy, error: plaidError, clearError } = usePlaidLink();
+  const [connections, setConnections] = useState<BankConnection[]>([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const refreshConnections = useCallback(async () => {
+    setLoadingConnections(true);
+    try {
+      const rows = await listBankConnections(getToken);
+      setConnections(rows);
+    } catch {
+      setConnections([]);
+    } finally {
+      setLoadingConnections(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => {
+    void refreshConnections();
+  }, [refreshConnections]);
 
   const handleLogout = async () => {
     posthog.capture("logout_clicked", {
@@ -29,19 +59,127 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleSync = async () => {
+    setSyncBusy(true);
+    setSyncMessage(null);
+    try {
+      const result = await syncBankTransactions(getToken);
+      const detail = result.results
+        .map((r) =>
+          r.ok
+            ? `${r.itemId}: +${r.added ?? 0}/~${r.modified ?? 0}/-${r.removed ?? 0}`
+            : `${r.itemId}: ${r.error ?? "error"}`
+        )
+        .join(" · ");
+      setSyncMessage(
+        `${result.message} ${result.linkedAccounts} item(s). ${detail || ""}`.trim()
+      );
+      await refreshConnections();
+    } catch (e) {
+      setSyncMessage(e instanceof Error ? e.message : "Sync failed.");
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const connectUs = () => {
+    clearError();
+    void startLink("US");
+  };
+
+  const connectUk = () => {
+    clearError();
+    void startLink("GB");
+  };
+
   return (
     <SafeAreaView style={cx("auth-safe-area")} edges={["top"]}>
-      <View style={cx("auth-content")}>
+      <ScrollView
+        contentContainerStyle={[cx("auth-content"), { paddingBottom: 48 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={cx("auth-title")}>Settings</Text>
+
+        <View style={cx("auth-card")}>
+          <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>Linked banks (Plaid)</Text>
+          {plaidError ? (
+            <Text style={[cx("auth-error"), { marginBottom: 8 }]}>{plaidError}</Text>
+          ) : null}
+          {syncMessage ? (
+            <Text style={[cx("auth-helper"), { marginBottom: 8 }]}>{syncMessage}</Text>
+          ) : null}
+          {loadingConnections ? (
+            <ActivityIndicator style={{ marginBottom: 12 }} />
+          ) : connections.length === 0 ? (
+            <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>
+              No bank connections yet. Use a development build (not Expo Go) for Plaid Link.
+            </Text>
+          ) : (
+            <View style={{ gap: 10, marginBottom: 12 }}>
+              {connections.map((c) => (
+                <View key={c._id} style={{ borderWidth: 1, borderColor: "#e5e5e5", borderRadius: 8, padding: 10 }}>
+                  <Text style={{ fontWeight: "600" }}>
+                    {c.institutionName ?? c.institutionId ?? "Bank"}
+                  </Text>
+                  <Text style={cx("auth-helper")}>Status: {c.status}</Text>
+                  {c.lastSyncAt ? (
+                    <Text style={cx("auth-helper")}>Last sync: {new Date(c.lastSyncAt).toLocaleString()}</Text>
+                  ) : null}
+                  {c.lastSyncError ? (
+                    <Text style={cx("auth-error")}>{c.lastSyncError}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Pressable
+            onPress={connectUs}
+            disabled={plaidBusy || syncBusy}
+            style={[cx("auth-button"), (plaidBusy || syncBusy) && { opacity: 0.6 }]}
+          >
+            {plaidBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={cx("auth-button-text")}>Connect bank (US)</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={connectUk}
+            disabled={plaidBusy || syncBusy}
+            style={[cx("auth-button"), { marginTop: 10 }, (plaidBusy || syncBusy) && { opacity: 0.6 }]}
+          >
+            <Text style={cx("auth-button-text")}>Connect bank (UK)</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => void handleSync()}
+            disabled={syncBusy || plaidBusy}
+            style={[cx("auth-button"), { marginTop: 10, backgroundColor: "#333" }, (syncBusy || plaidBusy) && { opacity: 0.6 }]}
+          >
+            {syncBusy ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={cx("auth-button-text")}>Sync transactions now</Text>
+            )}
+          </Pressable>
+
+          <Pressable onPress={() => void refreshConnections()} style={{ marginTop: 12 }}>
+            <Text style={[cx("auth-helper"), { textDecorationLine: "underline" }]}>Refresh connection list</Text>
+          </Pressable>
+        </View>
+
         <View style={cx("auth-card")}>
           <Text style={cx("auth-helper")}>
             {user?.primaryEmailAddress?.emailAddress ?? "Signed in"}
           </Text>
-          <Pressable onPress={handleLogout} style={cx("auth-button")}>
+          <Pressable onPress={handleLogout} style={[cx("auth-button"), { marginTop: 16 }]}>
             <Text style={cx("auth-button-text")}>Log out</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

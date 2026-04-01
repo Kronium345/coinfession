@@ -82,3 +82,122 @@ export function getInsightsSummary(getToken: GetToken) {
   return authFetch<InsightSummary>(getToken, "/api/insights/summary");
 }
 
+export type PlaidLinkTokenResponse = {
+  provider: string;
+  linkToken: string;
+  expiration: string;
+  requestId: string;
+};
+
+export function createPlaidLinkToken(
+  getToken: GetToken,
+  body: { countryCode?: "US" | "GB"; androidPackageName?: string }
+) {
+  return authFetch<PlaidLinkTokenResponse>(getToken, "/api/bank/link-token", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function exchangePlaidPublicToken(
+  getToken: GetToken,
+  body: {
+    publicToken: string;
+    metadata?: {
+      institution?: { institution_id?: string; name?: string };
+      accounts?: { id: string }[];
+    };
+  }
+) {
+  return authFetch<{
+    message: string;
+    itemId: string;
+    connectedAccountId: string;
+    institutionName?: string | null;
+    institutionId?: string | null;
+  }>(getToken, "/api/bank/exchange-token", {
+    method: "POST",
+    body: JSON.stringify({
+      publicToken: body.publicToken,
+      metadata: body.metadata,
+    }),
+  });
+}
+
+export function syncBankTransactions(getToken: GetToken) {
+  return authFetch<{
+    message: string;
+    linkedAccounts: number;
+    results: Array<{
+      itemId: string;
+      ok: boolean;
+      pages?: number;
+      added?: number;
+      modified?: number;
+      removed?: number;
+      error?: string;
+    }>;
+  }>(getToken, "/api/bank/sync", { method: "POST" });
+}
+
+export type BankConnection = {
+  _id: string;
+  clerkUserId: string;
+  provider: string;
+  itemId: string;
+  institutionId?: string | null;
+  institutionName?: string | null;
+  plaidAccountIds?: string[];
+  status: string;
+  lastSyncAt?: string | null;
+  lastSyncError?: string | null;
+  transactionsCursor?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export function listBankConnections(getToken: GetToken) {
+  return authFetch<BankConnection[]>(getToken, "/api/bank/connections");
+}
+
+export type NormalizedTransaction = {
+  _id: string;
+  amount: number;
+  currency: string;
+  merchant: string;
+  category: string;
+  occurredAt: string;
+  sourceType: string;
+  sourceRef?: string | null;
+  pending?: boolean;
+  plaidCategoryLabels?: string[];
+};
+
+export function listTransactions(
+  getToken: GetToken,
+  query?: {
+    page?: number;
+    limit?: number;
+    sourceType?: string;
+    startDate?: string;
+    endDate?: string;
+    category?: string;
+  }
+) {
+  const params = new URLSearchParams();
+  if (query?.page) params.set("page", String(query.page));
+  if (query?.limit) params.set("limit", String(query.limit));
+  if (query?.sourceType) params.set("sourceType", query.sourceType);
+  if (query?.startDate) params.set("startDate", query.startDate);
+  if (query?.endDate) params.set("endDate", query.endDate);
+  if (query?.category) params.set("category", query.category);
+  const q = params.toString();
+  return authFetch<{
+    items: NormalizedTransaction[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  }>(getToken, `/api/transactions${q ? `?${q}` : ""}`);
+}
+
