@@ -1,6 +1,7 @@
 import {
   createPlaidLinkToken,
   exchangePlaidPublicToken,
+  recomputeInsights,
   syncBankTransactions,
 } from "@/lib/api";
 import { useAuth } from "@clerk/expo";
@@ -47,6 +48,7 @@ export function usePlaidLink() {
                 },
               });
               await syncBankTransactions(getToken);
+              await recomputeInsights(getToken);
             } catch (err) {
               setError(
                 err instanceof Error ? err.message : "Link succeeded but server exchange/sync failed."

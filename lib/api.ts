@@ -82,6 +82,14 @@ export function getInsightsSummary(getToken: GetToken) {
   return authFetch<InsightSummary>(getToken, "/api/insights/summary");
 }
 
+export function recomputeInsights(getToken: GetToken) {
+  return authFetch<{
+    message: string;
+    snapshot: InsightSummary;
+    features: Record<string, number>;
+  }>(getToken, "/api/insights/recompute", { method: "POST" });
+}
+
 export type PlaidLinkTokenResponse = {
   provider: string;
   linkToken: string;

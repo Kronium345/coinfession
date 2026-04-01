@@ -1,4 +1,9 @@
-import { listBankConnections, syncBankTransactions, type BankConnection } from "@/lib/api";
+import {
+  listBankConnections,
+  recomputeInsights,
+  syncBankTransactions,
+  type BankConnection,
+} from "@/lib/api";
 import { cx } from "@/lib/tw";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
@@ -79,6 +84,10 @@ export default function SettingsScreen() {
             : `${r.itemId}: ${r.error ?? "error"}`
         )
         .join(" · ");
+      const hasSuccessfulSync = result.results.some((r) => r.ok);
+      if (hasSuccessfulSync) {
+        await recomputeInsights(getTokenRef.current);
+      }
       setSyncMessage(
         `${result.message} ${result.linkedAccounts} item(s). ${detail || ""}`.trim()
       );
