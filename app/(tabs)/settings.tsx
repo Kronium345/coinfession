@@ -1,4 +1,5 @@
 import {
+  getInsightsSummary,
   listBankConnections,
   recomputeInsights,
   syncBankTransactions,
@@ -8,7 +9,7 @@ import { cx } from "@/lib/tw";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -29,10 +30,28 @@ export default function SettingsScreen() {
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [insightsUpdatedAt, setInsightsUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     getTokenRef.current = getToken;
   }, [getToken]);
+
+  const lastBankSync = useMemo(() => {
+    const times = connections
+      .map((c) => (c.lastSyncAt ? new Date(c.lastSyncAt).getTime() : null))
+      .filter((t): t is number => t !== null);
+    if (times.length === 0) return null;
+    return new Date(Math.max(...times));
+  }, [connections]);
+
+  const refreshInsightsMeta = useCallback(async () => {
+    try {
+      const summary = await getInsightsSummary(getTokenRef.current);
+      setInsightsUpdatedAt(summary.insightsUpdatedAt ?? null);
+    } catch {
+      setInsightsUpdatedAt(null);
+    }
+  }, []);
 
   const refreshConnections = useCallback(async () => {
     setLoadingConnections(true);
@@ -50,7 +69,8 @@ export default function SettingsScreen() {
     if (hasBootstrappedRef.current) return;
     hasBootstrappedRef.current = true;
     void refreshConnections();
-  }, [refreshConnections]);
+    void refreshInsightsMeta();
+  }, [refreshConnections, refreshInsightsMeta]);
 
   const handleLogout = async () => {
     posthog.capture("logout_clicked", {
@@ -186,6 +206,20 @@ export default function SettingsScreen() {
           <Pressable onPress={() => void refreshConnections()} style={{ marginTop: 12 }}>
             <Text style={[cx("auth-helper"), { textDecorationLine: "underline" }]}>Refresh connection list</Text>
           </Pressable>
+          {lastBankSync ? (
+            <Text style={[cx("auth-helper"), { marginTop: 10 }]}>
+              Last bank sync: {lastBankSync.toLocaleString()}
+            </Text>
+          ) : null}
+          {insightsUpdatedAt ? (
+            <Text style={[cx("auth-helper"), { marginTop: 4 }]}>
+              Insights last computed: {new Date(insightsUpdatedAt).toLocaleString()}
+            </Text>
+          ) : null}
+          <Text style={[cx("auth-helper"), { marginTop: 12 }]}>
+            Linking a bank only requests read-only transaction data for this app. Plaid does not
+            charge your accounts on behalf of Coinfession from this connection flow.
+          </Text>
         </View>
 
         <View style={cx("auth-card")}>

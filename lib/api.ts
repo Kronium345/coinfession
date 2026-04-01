@@ -71,11 +71,35 @@ export type InsightItem = {
   suggestion: string;
 };
 
+export type CashflowSummary = {
+  monthLabel: string;
+  monthStart: string;
+  monthEnd: string;
+  currentMonthTotal: number;
+  previousMonthTotal: number;
+  monthOverMonthPercent: number | null;
+  categoryTotals: { category: string; total: number }[];
+  topMerchants: { merchant: string; total: number; count: number }[];
+};
+
+export type BudgetStatus = {
+  id: string;
+  category: string;
+  monthlyLimit: number;
+  currency: string;
+  spent: number;
+  remaining: number;
+  status: "ok" | "warning" | "over";
+};
+
 export type InsightSummary = {
   items: InsightItem[];
   windowStart: string;
   windowEnd: string;
   engineVersion: string;
+  insightsUpdatedAt?: string;
+  cashflow: CashflowSummary;
+  budgetStatuses: BudgetStatus[];
 };
 
 export function getInsightsSummary(getToken: GetToken) {
@@ -88,6 +112,35 @@ export function recomputeInsights(getToken: GetToken) {
     snapshot: InsightSummary;
     features: Record<string, number>;
   }>(getToken, "/api/insights/recompute", { method: "POST" });
+}
+
+export type ApiBudget = {
+  _id: string;
+  clerkUserId: string;
+  categoryKey: string;
+  displayCategory: string;
+  monthlyLimit: number;
+  currency: string;
+};
+
+export function listBudgets(getToken: GetToken) {
+  return authFetch<ApiBudget[]>(getToken, "/api/budgets");
+}
+
+export function upsertBudget(
+  getToken: GetToken,
+  body: { category: string; monthlyLimit: number; currency?: string }
+) {
+  return authFetch<ApiBudget>(getToken, "/api/budgets", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteBudget(getToken: GetToken, id: string) {
+  return authFetch<{ message: string }>(getToken, `/api/budgets/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export type PlaidLinkTokenResponse = {

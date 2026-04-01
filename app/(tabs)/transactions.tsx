@@ -1,11 +1,12 @@
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { listTransactions, type NormalizedTransaction } from "@/lib/api";
+import { shareTransactionsAsCsv } from "@/lib/exportCsv";
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
 import { cx } from "@/lib/tw";
 import { useAuth } from "@clerk/expo";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../theme";
 
@@ -15,6 +16,7 @@ export default function TransactionsScreen() {
   const [items, setItems] = useState<NormalizedTransaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,6 +40,21 @@ export default function TransactionsScreen() {
     [items]
   );
 
+  const onExportCsv = async () => {
+    if (items.length === 0) {
+      Alert.alert("Nothing to export", "Sync transactions first, then try again.");
+      return;
+    }
+    setExportBusy(true);
+    try {
+      await shareTransactionsAsCsv(items);
+    } catch (e) {
+      Alert.alert("Export failed", e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
   const addAsSubscription = async (txn: NormalizedTransaction) => {
     const now = dayjs();
     await addSubscription({
@@ -59,7 +76,22 @@ export default function TransactionsScreen() {
 
   return (
     <SafeAreaView style={[cx("flex-1 px-5 pt-2"), { backgroundColor: colors.background }]} edges={["top"]}>
-      <Text style={cx("list-title", "mb-2")}>Transactions</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <Text style={cx("list-title", "mb-0")}>Transactions</Text>
+        <Pressable
+          onPress={() => void onExportCsv()}
+          disabled={exportBusy || items.length === 0}
+          style={{ opacity: exportBusy || items.length === 0 ? 0.5 : 1 }}
+        >
+          {exportBusy ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={[cx("auth-helper"), { textDecorationLine: "underline", color: colors.primary }]}>
+              Export CSV
+            </Text>
+          )}
+        </Pressable>
+      </View>
       <Text style={cx("auth-helper", "mb-4")}>Bank-synced total: ${total.toFixed(2)}</Text>
       {loading ? <Text style={cx("home-empty-state")}>Loading transactions...</Text> : null}
       {error ? <Text style={cx("home-empty-state")}>{error}</Text> : null}

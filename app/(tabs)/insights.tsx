@@ -1,6 +1,11 @@
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { cx } from "@/lib/tw";
-import { getInsightsSummary, type InsightItem } from "@/lib/api";
+import {
+  deleteBudget,
+  getInsightsSummary,
+  upsertBudget,
+  type InsightSummary,
+} from "@/lib/api";
 import {
   axisTicks,
   buildHistoryRows,
@@ -17,11 +22,13 @@ import { useRouter } from "expo-router";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,8 +42,13 @@ export default function InsightsScreen() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const { subscriptions } = useSubscriptions();
   const [now] = useState(() => dayjs());
-  const [insightItem, setInsightItem] = useState<InsightItem | null>(null);
+  const [insightSummary, setInsightSummary] = useState<InsightSummary | null>(null);
   const [insightError, setInsightError] = useState<string | null>(null);
+  const [budgetCategory, setBudgetCategory] = useState("");
+  const [budgetLimit, setBudgetLimit] = useState("");
+  const [budgetBusy, setBudgetBusy] = useState(false);
+
+  const insightItem = insightSummary?.items[0] ?? null;
 
   const insightMonth = useMemo(() => now.startOf("month"), [now]);
   const prevMonth = useMemo(() => insightMonth.subtract(1, "month"), [insightMonth]);
@@ -97,7 +109,7 @@ export default function InsightsScreen() {
       try {
         const summary = await getInsightsSummary(getToken);
         if (active) {
-          setInsightItem(summary.items[0] ?? null);
+          setInsightSummary(summary);
           setInsightError(null);
         }
       } catch (error) {
@@ -112,6 +124,38 @@ export default function InsightsScreen() {
       active = false;
     };
   }, [getToken, isLoaded, isSignedIn]);
+
+  const refreshInsightSummary = async () => {
+    const summary = await getInsightsSummary(getToken);
+    setInsightSummary(summary);
+  };
+
+  const onAddBudget = async () => {
+    const limit = Number.parseFloat(budgetLimit);
+    if (!budgetCategory.trim() || !Number.isFinite(limit) || limit <= 0) return;
+    setBudgetBusy(true);
+    try {
+      await upsertBudget(getToken, { category: budgetCategory.trim(), monthlyLimit: limit });
+      await refreshInsightSummary();
+      setBudgetCategory("");
+      setBudgetLimit("");
+    } catch (e) {
+      setInsightError(e instanceof Error ? e.message : "Could not save budget.");
+    } finally {
+      setBudgetBusy(false);
+    }
+  };
+
+  const onDeleteBudget = async (id: string) => {
+    try {
+      await deleteBudget(getToken, id);
+      await refreshInsightSummary();
+    } catch (e) {
+      setInsightError(e instanceof Error ? e.message : "Could not remove budget.");
+    }
+  };
+
+  const cf = insightSummary?.cashflow;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -239,6 +283,126 @@ export default function InsightsScreen() {
           Total is the sum of renewal amounts dated in {monthLabel} for active
           subscriptions (cash basis).
         </Text>
+
+        {cf ? (
+          <View style={styles.secondaryCard}>
+            <Text style={styles.secondaryTitle}>Spending from linked accounts</Text>
+            <Text style={styles.secondarySub}>{cf.monthLabel}</Text>
+            <View style={styles.secondaryRow}>
+              <Text style={styles.secondaryAmount}>
+                {formatCurrency(cf.currentMonthTotal, "USD")}
+              </Text>
+              <Text style={styles.secondaryDelta}>
+                {cf.monthOverMonthPercent === null
+                  ? "— vs prior month"
+                  : `${cf.monthOverMonthPercent >= 0 ? "+" : ""}${cf.monthOverMonthPercent.toFixed(0)}% vs prior month`}
+              </Text>
+            </View>
+            <Text style={styles.secondaryFoot}>
+              Sum of bank-synced transactions posted this calendar month (absolute amounts).
+            </Text>
+          </View>
+        ) : null}
+
+        {cf && cf.categoryTotals.length > 0 ? (
+          <View style={styles.secondaryCard}>
+            <Text style={styles.secondaryTitle}>Top categories (bank)</Text>
+            {cf.categoryTotals.slice(0, 5).map((c) => (
+              <View key={c.category} style={styles.listRow}>
+                <Text style={styles.listRowLeft} numberOfLines={1}>
+                  {c.category}
+                </Text>
+                <Text style={styles.listRowRight}>{formatCurrency(c.total, "USD")}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {cf && cf.topMerchants.length > 0 ? (
+          <View style={styles.secondaryCard}>
+            <Text style={styles.secondaryTitle}>Top merchants (bank)</Text>
+            {cf.topMerchants.slice(0, 5).map((m) => (
+              <View key={m.merchant} style={styles.listRow}>
+                <Text style={styles.listRowLeft} numberOfLines={1}>
+                  {m.merchant}
+                </Text>
+                <Text style={styles.listRowRight}>{formatCurrency(m.total, "USD")}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        <View style={styles.secondaryCard}>
+          <Text style={styles.secondaryTitle}>Monthly category caps</Text>
+          <Text style={styles.secondaryFoot}>
+            Use the same category label as your bank transactions (case-insensitive). We warn at
+            80% of the cap and when you go over.
+          </Text>
+          {insightSummary?.budgetStatuses?.length ? (
+            insightSummary.budgetStatuses.map((b) => (
+              <View key={b.id} style={styles.budgetRow}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.listRowLeft}>{b.category}</Text>
+                  <Text
+                    style={[
+                      styles.budgetMeta,
+                      b.status === "over"
+                        ? { color: colors.accent }
+                        : b.status === "warning"
+                          ? { color: "#c27b16" }
+                          : null,
+                    ]}
+                  >
+                    Spent {formatCurrency(b.spent, b.currency)} / cap{" "}
+                    {formatCurrency(b.monthlyLimit, b.currency)}
+                    {b.status === "over" ? " · Over cap" : b.status === "warning" ? " · Near cap" : ""}
+                  </Text>
+                </View>
+                <Pressable onPress={() => void onDeleteBudget(b.id)} hitSlop={8}>
+                  <Text style={styles.budgetRemove}>Remove</Text>
+                </Pressable>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.secondaryFoot}>No caps yet — add one below.</Text>
+          )}
+          <View style={styles.budgetForm}>
+            <TextInput
+              placeholder="Category (e.g. FOOD_AND_DRINK)"
+              placeholderTextColor={colors.mutedForeground}
+              value={budgetCategory}
+              onChangeText={setBudgetCategory}
+              style={styles.budgetInput}
+              autoCapitalize="none"
+            />
+            <TextInput
+              placeholder="Monthly limit (USD)"
+              placeholderTextColor={colors.mutedForeground}
+              value={budgetLimit}
+              onChangeText={setBudgetLimit}
+              keyboardType="decimal-pad"
+              style={styles.budgetInput}
+            />
+            <Pressable
+              onPress={() => void onAddBudget()}
+              disabled={budgetBusy}
+              style={[styles.budgetSaveBtn, budgetBusy ? { opacity: 0.6 } : null]}
+            >
+              {budgetBusy ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text style={styles.budgetSaveText}>Save cap</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {insightSummary?.insightsUpdatedAt ? (
+          <Text style={styles.metaHint}>
+            Rule-based insights last computed{" "}
+            {dayjs(insightSummary.insightsUpdatedAt).format("MMM D, YYYY h:mm A")}.
+          </Text>
+        ) : null}
 
         <View style={styles.aiCard}>
           <Text style={styles.aiTitle}>Smarter suggestions</Text>
@@ -480,6 +644,125 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     marginBottom: 16,
     lineHeight: 17,
+  },
+  secondaryCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    padding: 16,
+    marginBottom: 14,
+  },
+  secondaryTitle: {
+    fontFamily: fonts.sansBold,
+    fontSize: 16,
+    color: colors.primary,
+  },
+  secondarySub: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.mutedForeground,
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  secondaryRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  secondaryAmount: {
+    fontFamily: fonts.sansExtrabold,
+    fontSize: 22,
+    color: colors.primary,
+  },
+  secondaryDelta: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 13,
+    color: colors.accent,
+    flexShrink: 1,
+    textAlign: "right",
+  },
+  secondaryFoot: {
+    marginTop: 10,
+    fontFamily: fonts.sansMedium,
+    fontSize: 11,
+    color: colors.mutedForeground,
+    lineHeight: 16,
+  },
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(8, 17, 38, 0.08)",
+  },
+  listRowLeft: {
+    flex: 1,
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.primary,
+    marginRight: 8,
+  },
+  listRowRight: {
+    fontFamily: fonts.sansBold,
+    fontSize: 14,
+    color: colors.primary,
+  },
+  budgetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(8, 17, 38, 0.08)",
+    gap: 8,
+  },
+  budgetMeta: {
+    marginTop: 4,
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    color: colors.mutedForeground,
+  },
+  budgetRemove: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 13,
+    color: colors.primary,
+    textDecorationLine: "underline",
+  },
+  budgetForm: {
+    marginTop: 14,
+    gap: 10,
+  },
+  budgetInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: fonts.sansMedium,
+    fontSize: 15,
+    color: colors.primary,
+    backgroundColor: colors.background,
+  },
+  budgetSaveBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  budgetSaveText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 15,
+    color: colors.background,
+  },
+  metaHint: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 11,
+    color: colors.mutedForeground,
+    marginBottom: 12,
+    lineHeight: 16,
   },
   aiCard: {
     backgroundColor: colors.muted,
