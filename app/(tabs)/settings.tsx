@@ -11,9 +11,8 @@ import { cx } from "@/lib/tw";
 import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
-import { useUserProfileModal } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,11 +26,11 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { colors } from "../../theme";
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { signOut } = useClerk();
   const { user } = useUser();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
-  const { presentUserProfile, isAvailable } = useUserProfileModal();
   const getTokenRef = useRef(getToken);
   const hasBootstrappedRef = useRef(false);
   const posthog = usePostHog();
@@ -188,17 +187,10 @@ export default function SettingsScreen() {
             </View>
           </View>
           <Pressable
-            onPress={() => void presentUserProfile()}
-            disabled={!isAvailable}
-            style={[
-              cx("auth-button"),
-              { marginTop: 14 },
-              !isAvailable ? { opacity: 0.6 } : null,
-            ]}
+            onPress={() => router.push("/user-profile")}
+            style={[cx("auth-button"), { marginTop: 14 }]}
           >
-            <Text style={cx("auth-button-text")}>
-              {isAvailable ? "Edit profile photo/details" : "Profile unavailable"}
-            </Text>
+            <Text style={cx("auth-button-text")}>Edit profile photo/details</Text>
           </Pressable>
         </View>
 

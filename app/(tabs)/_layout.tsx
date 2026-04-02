@@ -5,7 +5,7 @@ import { colours, components } from "@/constants/theme";
 import { cx } from "@/lib/tw";
 import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Image, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconProps = {
@@ -54,6 +54,11 @@ const TabsLayout = () => {
     }
     return (
     <SubscriptionsProvider>
+    <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        enabled={Platform.OS === "ios"}
+    >
     <Tabs screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -87,7 +92,15 @@ const TabsLayout = () => {
                     )
                 }} />
         ))}
+        <Tabs.Screen
+            name="user-profile"
+            options={{
+                href: null,
+                title: "Account",
+            }}
+        />
     </Tabs>
+    </KeyboardAvoidingView>
     </SubscriptionsProvider>
     );
 }
