@@ -4,7 +4,7 @@
     "slug": "coinfession",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/coinfession-icon.png",
     "scheme": "coinfession",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -66,6 +66,13 @@
           "color": "#ea7a53",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Coinfession to access your photos for your profile picture.",
+          "cameraPermission": "Allow Coinfession to use the camera for your profile picture."
         }
       ],
       "expo-localization"
