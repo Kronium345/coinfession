@@ -18,7 +18,6 @@ import {
   Alert,
   FlatList,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -128,27 +127,37 @@ export default function TransactionsScreen() {
         </Pressable>
       </View>
       {connections.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingBottom: 10 }}
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 10,
+            width: "100%",
+            paddingBottom: 12,
+          }}
         >
           <Pressable
             onPress={() => setFilterItemId(null)}
             style={{
-              paddingHorizontal: 14,
-              paddingVertical: 8,
+              flexGrow: 1,
+              flexBasis: "45%",
+              minWidth: 148,
+              paddingHorizontal: 18,
+              paddingVertical: 14,
               borderRadius: 999,
               backgroundColor: filterItemId === null ? colors.accent : colors.card,
               borderWidth: 1,
               borderColor: colors.border,
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             <Text
               style={{
                 fontWeight: "600",
-                fontSize: 13,
+                fontSize: 15,
                 color: filterItemId === null ? colors.primary : colors.mutedForeground,
+                textAlign: "center",
               }}
             >
               All accounts
@@ -161,29 +170,34 @@ export default function TransactionsScreen() {
                 key={c.itemId}
                 onPress={() => setFilterItemId(c.itemId)}
                 style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
+                  flexGrow: 1,
+                  flexBasis: "45%",
+                  minWidth: 148,
+                  paddingHorizontal: 18,
+                  paddingVertical: 14,
                   borderRadius: 999,
                   backgroundColor: active ? colors.accent : colors.card,
                   borderWidth: 1,
                   borderColor: colors.border,
-                  maxWidth: 220,
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
                 <Text
                   style={{
                     fontWeight: "600",
-                    fontSize: 13,
+                    fontSize: 15,
                     color: active ? colors.primary : colors.mutedForeground,
+                    textAlign: "center",
                   }}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {c.institutionName ?? c.itemId}
                 </Text>
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
       ) : null}
       <Text style={cx("auth-helper", "mb-4")}>
         Bank-synced total

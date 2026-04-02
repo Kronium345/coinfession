@@ -124,7 +124,7 @@ export const semanticClasses = {
   "auth-link-copy": "text-sm font-sans-medium text-muted-foreground",
   "auth-link": "text-sm font-sans-bold text-accent",
   "modal-overlay": "flex-1 bg-black/50",
-  "modal-container": "mt-auto max-h-[85%] rounded-t-3xl bg-background",
+  "modal-container": "mt-auto max-h-[78%] rounded-t-3xl bg-background",
   "modal-header": "flex-row items-center justify-between border-b border-border px-5 py-4",
   "modal-title": "text-xl font-sans-bold text-primary",
   "modal-close": "size-8 items-center justify-center rounded-full bg-muted",

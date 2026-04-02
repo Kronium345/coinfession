@@ -1,5 +1,6 @@
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
 import { cx } from "@/lib/tw";
+import { getCurrencyNarrowSymbol } from "@/lib/utils";
 import clsx from "clsx";
 import { toast } from "burnt";
 import dayjs from "dayjs";
@@ -16,7 +17,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { colors } from "../theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors, fonts } from "../theme";
 
 const CATEGORIES = [
   "Entertainment",
@@ -61,6 +63,7 @@ export default function CreateSubscriptionModal({
   onCreate,
   defaultCurrency = "USD",
 }: CreateSubscriptionModalProps) {
+  const insets = useSafeAreaInsets();
   const posthog = usePostHog();
   const [name, setName] = useState("");
   const [priceText, setPriceText] = useState("");
@@ -85,6 +88,11 @@ export default function CreateSubscriptionModal({
     const n = Number.parseFloat(priceText.replace(/,/g, ""));
     return Number.isFinite(n) ? n : NaN;
   }, [priceText]);
+
+  const currencySymbol = useMemo(
+    () => getCurrencyNarrowSymbol(defaultCurrency),
+    [defaultCurrency]
+  );
 
   const canSubmit =
     name.trim().length > 0 && Number.isFinite(priceNumber) && priceNumber > 0;
@@ -159,9 +167,13 @@ export default function CreateSubscriptionModal({
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.keyboardArea}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+          style={[
+            styles.keyboardArea,
+            { marginBottom: Math.max(insets.bottom, 20) },
+          ]}
         >
-          <View style={cx("modal-container")}>
+          <View style={[cx("modal-container"), styles.modalSheet]}>
             <View style={cx("modal-header")}>
               <Text style={cx("modal-title")}>New Subscription</Text>
               <Pressable
@@ -176,8 +188,9 @@ export default function CreateSubscriptionModal({
 
             <ScrollView
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={cx("modal-body")}
+              contentContainerStyle={[cx("modal-body"), { paddingBottom: 28 }]}
               showsVerticalScrollIndicator={false}
+              bounces={false}
             >
               <View style={cx("auth-field")}>
                 <Text style={cx("auth-label")}>Name</Text>
@@ -191,15 +204,56 @@ export default function CreateSubscriptionModal({
               </View>
 
               <View style={cx("auth-field")}>
-                <Text style={cx("auth-label")}>Price</Text>
-                <TextInput
-                  value={priceText}
-                  onChangeText={setPriceText}
-                  placeholder="0.00"
-                  placeholderTextColor={colors.mutedForeground}
-                  keyboardType="decimal-pad"
-                  style={cx("auth-input")}
-                />
+                <Text style={cx("auth-label")}>
+                  Price
+                  <Text style={{ fontWeight: "400", color: colors.mutedForeground }}>
+                    {" "}
+                    ({defaultCurrency})
+                  </Text>
+                </Text>
+                <View
+                  style={[
+                    cx("auth-input"),
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      paddingVertical: 0,
+                      paddingHorizontal: 0,
+                      gap: 0,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      paddingVertical: 16,
+                      paddingLeft: 16,
+                      paddingRight: 10,
+                      fontSize: 16,
+                      fontFamily: fonts.sansMedium,
+                      color: colors.mutedForeground,
+                      borderRightWidth: StyleSheet.hairlineWidth,
+                      borderRightColor: colors.border,
+                    }}
+                  >
+                    {currencySymbol}
+                  </Text>
+                  <TextInput
+                    value={priceText}
+                    onChangeText={setPriceText}
+                    placeholder="0.00"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="decimal-pad"
+                    accessibilityLabel={`Price in ${defaultCurrency}`}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 16,
+                      paddingHorizontal: 14,
+                      fontSize: 16,
+                      fontFamily: fonts.sansMedium,
+                      color: colors.primary,
+                    }}
+                  />
+                </View>
               </View>
 
               <View style={cx("auth-field")}>
@@ -310,5 +364,8 @@ const styles = StyleSheet.create({
   },
   keyboardArea: {
     width: "100%",
+  },
+  modalSheet: {
+    overflow: "hidden",
   },
 });

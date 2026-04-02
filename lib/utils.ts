@@ -13,6 +13,20 @@ export const formatCurrency = (value: number, currency = "USD"): string => {
     }
 };
 
+/** Narrow symbol for UI prefixes (e.g. GBP → £, USD → $). Falls back to the ISO code. */
+export function getCurrencyNarrowSymbol(currencyCode: string): string {
+    try {
+        const parts = new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency: currencyCode,
+            currencyDisplay: "narrowSymbol",
+        }).formatToParts(0);
+        return parts.find((p) => p.type === "currency")?.value ?? currencyCode;
+    } catch {
+        return currencyCode;
+    }
+}
+
 export const formatSubscriptionDateTime = (value?: string): string => {
     if (!value) return "Not provided";
     const parsedDate = dayjs(value);
