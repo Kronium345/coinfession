@@ -229,7 +229,7 @@ export default function SettingsScreen() {
           <Pressable
             onPress={() => void handleSync()}
             disabled={syncBusy || plaidBusy}
-            style={[cx("auth-button"), { marginTop: 10, backgroundColor: "#333" }, (syncBusy || plaidBusy) && { opacity: 0.6 }]}
+            style={[cx("auth-button"), { marginTop: 10 }, (syncBusy || plaidBusy) && { opacity: 0.6 }]}
           >
             {syncBusy ? (
               <ActivityIndicator color="#fff" />

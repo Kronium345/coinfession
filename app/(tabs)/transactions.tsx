@@ -2,6 +2,7 @@ import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { listTransactions, toUserFriendlyErrorMessage, type NormalizedTransaction } from "@/lib/api";
 import { shareTransactionsAsCsv } from "@/lib/exportCsv";
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
+import { formatCurrency } from "@/lib/utils";
 import { cx } from "@/lib/tw";
 import { useAuth } from "@clerk/expo";
 import dayjs from "dayjs";
@@ -40,10 +41,11 @@ export default function TransactionsScreen() {
     void load();
   }, [load]);
 
-  const total = useMemo(
-    () => items.reduce((sum, item) => sum + Math.abs(item.amount), 0),
-    [items]
-  );
+  const { totalAmount, totalCurrency } = useMemo(() => {
+    const cur = items[0]?.currency ?? "USD";
+    const sum = items.reduce((acc, item) => acc + Math.abs(item.amount), 0);
+    return { totalAmount: sum, totalCurrency: cur };
+  }, [items]);
 
   const onExportCsv = async () => {
     if (items.length === 0) {
@@ -97,7 +99,9 @@ export default function TransactionsScreen() {
           )}
         </Pressable>
       </View>
-      <Text style={cx("auth-helper", "mb-4")}>Bank-synced total: ${total.toFixed(2)}</Text>
+      <Text style={cx("auth-helper", "mb-4")}>
+        Bank-synced total: {formatCurrency(totalAmount, totalCurrency)}
+      </Text>
       {loading ? <Text style={cx("home-empty-state")}>Loading transactions...</Text> : null}
       {error ? <Text style={cx("home-empty-state")}>{error}</Text> : null}
       <FlatList
@@ -113,7 +117,9 @@ export default function TransactionsScreen() {
             <Text style={cx("auth-helper")}>
               {dayjs(item.occurredAt).format("MMM D, YYYY")} • {item.pending ? "Pending" : "Posted"}
             </Text>
-            <Text style={cx("auth-title")}>${Math.abs(item.amount).toFixed(2)}</Text>
+            <Text style={cx("auth-title")}>
+              {formatCurrency(Math.abs(item.amount), item.currency ?? "USD")}
+            </Text>
             <Pressable onPress={() => void addAsSubscription(item)} style={[cx("auth-button"), { marginTop: 8 }]}>
               <Text style={cx("auth-button-text")}>Add as subscription</Text>
             </Pressable>

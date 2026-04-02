@@ -2,12 +2,11 @@ import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubsCard from "@/components/UpcomingSubsCard";
-import { HOME_BALANCE } from "@/constants/data";
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { icons } from "@/constants/icons";
 import images from "@/constants/images";
 import { cx } from "@/lib/tw";
-import { formatCurrency, formatSubscriptionDateTime } from "@/lib/utils";
+import { formatCurrency, formatNextRenewalCaption } from "@/lib/utils";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
 import { useMemo, useState } from "react";
@@ -23,6 +22,30 @@ export default function App() {
   const { subscriptions, addSubscription, isLoading, syncError } = useSubscriptions();
   const { user } = useUser();
   const [createModalVisible, setCreateModalVisible] = useState(false);
+  const homeBalance = useMemo(() => {
+    const countsTowardTotal = (s: Subscription) => {
+      const st = s.status?.toLowerCase().trim();
+      return !st || st === "active";
+    };
+
+    const active = subscriptions.filter(countsTowardTotal);
+    const yearly = (billing: string) => /year|annual/i.test(billing ?? "");
+
+    let monthlyTotal = 0;
+    const currency = active[0]?.currency ?? "USD";
+    for (const s of active) {
+      monthlyTotal += yearly(s.billing) ? s.price / 12 : s.price;
+    }
+
+    const nextRenewal = active
+      .filter((s) => s.renewalDate)
+      .map((s) => ({ sub: s, at: dayjs(s.renewalDate) }))
+      .filter((x) => x.at.isValid())
+      .sort((a, b) => a.at.valueOf() - b.at.valueOf())[0]?.sub.renewalDate ?? null;
+
+    return { monthlyTotal, currency, nextRenewal };
+  }, [subscriptions]);
+
   const upcomingSubscriptions = useMemo<UpcomingSubscription[]>(() => {
     const now = dayjs();
 
@@ -80,10 +103,12 @@ export default function App() {
             </View>
 
             <View style={cx("home-balance-card")}>
-              <Text style={cx("home-balance-label")}>Balance</Text>
-              <View style={cx("home-balance-row")}>
-                <Text style={cx("home-balance-amount")}>{formatCurrency(HOME_BALANCE.amount)}</Text>
-                <Text style={cx("home-balance-date")}>{formatSubscriptionDateTime(HOME_BALANCE.nextRenewalDate)}</Text>
+              <Text style={cx("home-balance-label")}>Monthly recurring</Text>
+              <View style={cx("home-balance-stack")}>
+                <Text style={cx("home-balance-amount")}>
+                  {formatCurrency(homeBalance.monthlyTotal, homeBalance.currency)}
+                </Text>
+                <Text style={cx("home-balance-meta")}>{formatNextRenewalCaption(homeBalance.nextRenewal)}</Text>
               </View>
             </View>
 

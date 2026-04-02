@@ -12,6 +12,7 @@ const themeColorTokens: Record<string, string> = {
   "muted-foreground": colors.mutedForeground,
   primary: colors.primary,
   accent: colors.accent,
+  balance: colors.balance,
   border: colors.border,
   success: colors.success,
   destructive: colors.destructive,

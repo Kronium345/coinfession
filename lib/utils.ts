@@ -19,6 +19,13 @@ export const formatSubscriptionDateTime = (value?: string): string => {
     return parsedDate.isValid() ? parsedDate.format("MM/DD/YYYY") : "Not provided";
 };
 
+/** Single-line caption for the home balance card (short date, wraps safely). */
+export const formatNextRenewalCaption = (value?: string | null): string => {
+    if (!value) return "No renewals scheduled yet";
+    const parsed = dayjs(value);
+    return parsed.isValid() ? `Next renewal · ${parsed.format("MMM D, YYYY")}` : "No renewals scheduled yet";
+};
+
 export const formatStatusLabel = (value?: string): string => {
     if (!value) return "Unknown";
     return value.charAt(0).toUpperCase() + value.slice(1);

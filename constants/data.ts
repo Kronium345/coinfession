@@ -9,11 +9,6 @@ export const tabs: AppTab[] = [
     { name: "settings", title: "Settings", icon: icons.setting },
 ];
 
-export const HOME_BALANCE = {
-    amount: 2489.48,
-    nextRenewalDate: "2026-03-18T09:00:00.000Z",
-};
-
 export const UPCOMING_SUBSCRIPTIONS: UpcomingSubscription[] = [
     {
         id: "spotify",
