@@ -5,6 +5,7 @@ import {
   syncBankTransactions,
   type BankConnection,
 } from "@/lib/api";
+import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { cx } from "@/lib/tw";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
@@ -16,11 +17,14 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import images from "@/constants/images";
+import { colors } from "../../theme";
+
 export default function SettingsScreen() {
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -29,6 +33,11 @@ export default function SettingsScreen() {
   const getTokenRef = useRef(getToken);
   const hasBootstrappedRef = useRef(false);
   const posthog = usePostHog();
+  const {
+    renewalRemindersEnabled,
+    setRenewalRemindersEnabled,
+    renewalRemindersPrefLoaded,
+  } = useSubscriptions();
   const { startLink, busy: plaidBusy, error: plaidError, clearError } = usePlaidLink();
   const [connections, setConnections] = useState<BankConnection[]>([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
@@ -171,6 +180,33 @@ export default function SettingsScreen() {
               {isAvailable ? "Edit profile photo/details" : "Profile unavailable"}
             </Text>
           </Pressable>
+        </View>
+
+        <View style={cx("auth-card")}>
+          <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>Notifications</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={cx("auth-label")}>Renewal reminders</Text>
+              <Text style={[cx("auth-helper"), { marginTop: 4 }]}>
+                Schedules a local notification one day before each active subscription renews. Uses
+                this device only; rebuild after enabling the notifications plugin if needed.
+              </Text>
+            </View>
+            <Switch
+              value={renewalRemindersEnabled}
+              onValueChange={setRenewalRemindersEnabled}
+              disabled={!renewalRemindersPrefLoaded}
+              trackColor={{ false: "#c9c9c9", true: `${colors.accent}99` }}
+              thumbColor="#ffffff"
+            />
+          </View>
         </View>
 
         <View style={cx("auth-card")}>

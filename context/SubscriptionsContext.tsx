@@ -5,7 +5,12 @@ import {
   toUserFriendlyErrorMessage,
   type ApiSubscription,
 } from "@/lib/api";
+import {
+  clearRenewalScheduledNotifications,
+  syncSubscriptionRenewalReminders,
+} from "@/lib/notifications";
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@clerk/expo";
 import {
   createContext,
@@ -18,12 +23,17 @@ import {
   type ReactNode,
 } from "react";
 
+const RENEWAL_PREFS_KEY = "@coinfession/renewal_reminders_enabled";
+
 type SubscriptionsContextValue = {
   subscriptions: Subscription[];
   addSubscription: (subscription: Subscription) => Promise<void>;
   isLoading: boolean;
   syncError: string | null;
   refreshSubscriptions: () => Promise<void>;
+  renewalRemindersEnabled: boolean;
+  setRenewalRemindersEnabled: (value: boolean) => void;
+  renewalRemindersPrefLoaded: boolean;
 };
 
 const SubscriptionsContext = createContext<SubscriptionsContextValue | null>(
@@ -42,6 +52,22 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [renewalRemindersEnabled, setRenewalRemindersEnabledState] = useState(true);
+  const [renewalRemindersPrefLoaded, setRenewalRemindersPrefLoaded] = useState(false);
+
+  useEffect(() => {
+    void AsyncStorage.getItem(RENEWAL_PREFS_KEY).then((v) => {
+      if (v === "false") {
+        setRenewalRemindersEnabledState(false);
+      }
+      setRenewalRemindersPrefLoaded(true);
+    });
+  }, []);
+
+  const setRenewalRemindersEnabled = useCallback((next: boolean) => {
+    setRenewalRemindersEnabledState(next);
+    void AsyncStorage.setItem(RENEWAL_PREFS_KEY, next ? "true" : "false");
+  }, []);
 
   useEffect(() => {
     getTokenRef.current = getToken;
@@ -89,6 +115,24 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
     void refreshSubscriptions();
   }, [isLoaded, isSignedIn, refreshSubscriptions]);
 
+  useEffect(() => {
+    if (!renewalRemindersPrefLoaded || !isLoaded || !isSignedIn) return;
+    if (!renewalRemindersEnabled) {
+      void clearRenewalScheduledNotifications();
+      return;
+    }
+    void syncSubscriptionRenewalReminders(subscriptions);
+    return () => {
+      void clearRenewalScheduledNotifications();
+    };
+  }, [
+    renewalRemindersPrefLoaded,
+    isLoaded,
+    isSignedIn,
+    subscriptions,
+    renewalRemindersEnabled,
+  ]);
+
   const addSubscription = useCallback(
     async (subscription: Subscription) => {
       const payload = {
@@ -112,8 +156,26 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ subscriptions, addSubscription, isLoading, syncError, refreshSubscriptions }),
-    [subscriptions, addSubscription, isLoading, syncError, refreshSubscriptions]
+    () => ({
+      subscriptions,
+      addSubscription,
+      isLoading,
+      syncError,
+      refreshSubscriptions,
+      renewalRemindersEnabled,
+      setRenewalRemindersEnabled,
+      renewalRemindersPrefLoaded,
+    }),
+    [
+      subscriptions,
+      addSubscription,
+      isLoading,
+      syncError,
+      refreshSubscriptions,
+      renewalRemindersEnabled,
+      setRenewalRemindersEnabled,
+      renewalRemindersPrefLoaded,
+    ]
   );
 
   return (

@@ -110,6 +110,14 @@ export type InsightItem = {
   suggestion: string;
 };
 
+export type LinkedAccountSpend = {
+  itemId: string;
+  institutionName: string;
+  total: number;
+  currency: string;
+  transactionCount: number;
+};
+
 export type CashflowSummary = {
   monthLabel: string;
   monthStart: string;
@@ -117,8 +125,11 @@ export type CashflowSummary = {
   currentMonthTotal: number;
   previousMonthTotal: number;
   monthOverMonthPercent: number | null;
-  categoryTotals: { category: string; total: number }[];
+  dominantCurrency: string;
+  categoryTotals: { category: string; total: number; currency: string }[];
   topMerchants: { merchant: string; total: number; count: number }[];
+  /** Present after API deploy; empty array when no bank activity. */
+  linkedAccountSpend?: LinkedAccountSpend[];
 };
 
 export type BudgetStatus = {
@@ -127,6 +138,7 @@ export type BudgetStatus = {
   monthlyLimit: number;
   currency: string;
   spent: number;
+  spendCurrency: string;
   remaining: number;
   status: "ok" | "warning" | "over";
 };
@@ -271,6 +283,8 @@ export type NormalizedTransaction = {
   sourceRef?: string | null;
   pending?: boolean;
   plaidCategoryLabels?: string[];
+  linkedItemId?: string | null;
+  institutionName?: string | null;
 };
 
 export function listTransactions(
@@ -282,6 +296,7 @@ export function listTransactions(
     startDate?: string;
     endDate?: string;
     category?: string;
+    linkedItemId?: string;
   }
 ) {
   const params = new URLSearchParams();
@@ -291,6 +306,7 @@ export function listTransactions(
   if (query?.startDate) params.set("startDate", query.startDate);
   if (query?.endDate) params.set("endDate", query.endDate);
   if (query?.category) params.set("category", query.category);
+  if (query?.linkedItemId) params.set("linkedItemId", query.linkedItemId);
   const q = params.toString();
   return authFetch<{
     items: NormalizedTransaction[];

@@ -56,7 +56,7 @@ export const semanticClasses = {
   "home-avatar": "size-16 rounded-full",
   "home-user-name": "ml-4 text-2xl font-sans-bold text-primary",
   "home-add-icon": "size-12",
-  "home-balance-card": "my-2.5 min-h-50 gap-3 rounded-bl-4xl rounded-tr-4xl bg-balance p-6",
+  "home-balance-card": "my-2.5 min-h-50 gap-3 rounded-3xl bg-balance p-6",
   "home-balance-label": "text-lg font-sans-semibold text-white/85",
   "home-balance-stack": "gap-2",
   "home-balance-amount": "text-3xl font-sans-extrabold text-white",

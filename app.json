@@ -59,6 +59,14 @@
           ]
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ea7a53",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
       "expo-localization"
     ],
     "experiments": {

@@ -48,6 +48,7 @@ export default function InsightsScreen() {
   const [insightError, setInsightError] = useState<string | null>(null);
   const [budgetCategory, setBudgetCategory] = useState("");
   const [budgetLimit, setBudgetLimit] = useState("");
+  const [budgetCurrency, setBudgetCurrency] = useState("USD");
   const [budgetBusy, setBudgetBusy] = useState(false);
 
   const insightItem = insightSummary?.items[0] ?? null;
@@ -131,6 +132,13 @@ export default function InsightsScreen() {
     };
   }, [isLoaded, isSignedIn]);
 
+  useEffect(() => {
+    const d = insightSummary?.cashflow?.dominantCurrency;
+    if (d) {
+      setBudgetCurrency(d);
+    }
+  }, [insightSummary?.cashflow?.dominantCurrency]);
+
   const refreshInsightSummary = async () => {
     const summary = await getInsightsSummary(getTokenRef.current);
     setInsightSummary(summary);
@@ -141,7 +149,11 @@ export default function InsightsScreen() {
     if (!budgetCategory.trim() || !Number.isFinite(limit) || limit <= 0) return;
     setBudgetBusy(true);
     try {
-      await upsertBudget(getTokenRef.current, { category: budgetCategory.trim(), monthlyLimit: limit });
+      await upsertBudget(getTokenRef.current, {
+        category: budgetCategory.trim(),
+        monthlyLimit: limit,
+        currency: budgetCurrency,
+      });
       await refreshInsightSummary();
       setBudgetCategory("");
       setBudgetLimit("");
@@ -296,7 +308,7 @@ export default function InsightsScreen() {
             <Text style={styles.secondarySub}>{cf.monthLabel}</Text>
             <View style={styles.secondaryRow}>
               <Text style={styles.secondaryAmount}>
-                {formatCurrency(cf.currentMonthTotal, "USD")}
+                {formatCurrency(cf.currentMonthTotal, cf.dominantCurrency ?? "USD")}
               </Text>
               <Text style={styles.secondaryDelta}>
                 {cf.monthOverMonthPercent === null
@@ -305,8 +317,29 @@ export default function InsightsScreen() {
               </Text>
             </View>
             <Text style={styles.secondaryFoot}>
-              Sum of bank-synced transactions posted this calendar month (absolute amounts).
+              Sum of bank-synced transactions posted this calendar month (absolute amounts), all
+              linked institutions combined.
             </Text>
+          </View>
+        ) : null}
+
+        {cf && (cf.linkedAccountSpend?.length ?? 0) > 0 ? (
+          <View style={styles.secondaryCard}>
+            <Text style={styles.secondaryTitle}>By linked bank (this month)</Text>
+            <Text style={styles.secondaryFoot}>
+              Spend from each Plaid connection. Totals match bank-synced transactions only.
+            </Text>
+            {(cf.linkedAccountSpend ?? []).map((row) => (
+              <View key={row.itemId} style={styles.listRow}>
+                <Text style={styles.listRowLeft} numberOfLines={2}>
+                  {row.institutionName}
+                  {row.itemId === "__legacy__" ? " · pre-tag sync" : ""}
+                </Text>
+                <Text style={styles.listRowRight}>
+                  {formatCurrency(row.total, row.currency)} · {row.transactionCount} txns
+                </Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -318,7 +351,9 @@ export default function InsightsScreen() {
                 <Text style={styles.listRowLeft} numberOfLines={1}>
                   {c.category}
                 </Text>
-                <Text style={styles.listRowRight}>{formatCurrency(c.total, "USD")}</Text>
+                <Text style={styles.listRowRight}>
+                  {formatCurrency(c.total, c.currency ?? "USD")}
+                </Text>
               </View>
             ))}
           </View>
@@ -332,7 +367,9 @@ export default function InsightsScreen() {
                 <Text style={styles.listRowLeft} numberOfLines={1}>
                   {m.merchant}
                 </Text>
-                <Text style={styles.listRowRight}>{formatCurrency(m.total, "USD")}</Text>
+                <Text style={styles.listRowRight}>
+                  {formatCurrency(m.total, cf.dominantCurrency ?? "USD")}
+                </Text>
               </View>
             ))}
           </View>
@@ -341,8 +378,9 @@ export default function InsightsScreen() {
         <View style={styles.secondaryCard}>
           <Text style={styles.secondaryTitle}>Monthly category caps</Text>
           <Text style={styles.secondaryFoot}>
-            Use the same category label as your bank transactions (case-insensitive). We warn at
-            80% of the cap and when you go over.
+            Caps compare “spent” to real bank-synced totals for this calendar month. Pick a
+            category from your actual spend below (same Plaid primary label, case-insensitive).
+            We warn at 80% and when you exceed the cap.
           </Text>
           {insightSummary?.budgetStatuses?.length ? (
             insightSummary.budgetStatuses.map((b) => (
@@ -359,7 +397,7 @@ export default function InsightsScreen() {
                           : null,
                     ]}
                   >
-                    Spent {formatCurrency(b.spent, b.currency)} / cap{" "}
+                    Spent {formatCurrency(b.spent, b.spendCurrency ?? b.currency)} / cap{" "}
                     {formatCurrency(b.monthlyLimit, b.currency)}
                     {b.status === "over" ? " · Over cap" : b.status === "warning" ? " · Near cap" : ""}
                   </Text>
@@ -373,8 +411,36 @@ export default function InsightsScreen() {
             <Text style={styles.secondaryFoot}>No caps yet — add one below.</Text>
           )}
           <View style={styles.budgetForm}>
+            {cf && cf.categoryTotals.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.budgetChipRow}
+              >
+                {cf.categoryTotals.map((c) => {
+                  const selected = budgetCategory.toLowerCase() === c.category.toLowerCase();
+                  return (
+                    <Pressable
+                      key={c.category}
+                      onPress={() => {
+                        setBudgetCategory(c.category);
+                        setBudgetCurrency(c.currency ?? cf.dominantCurrency ?? "USD");
+                      }}
+                      style={[styles.budgetChip, selected ? styles.budgetChipOn : null]}
+                    >
+                      <Text
+                        style={[styles.budgetChipText, selected ? styles.budgetChipTextOn : null]}
+                        numberOfLines={1}
+                      >
+                        {c.category}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
             <TextInput
-              placeholder="Category (e.g. FOOD_AND_DRINK)"
+              placeholder="Category (tap above or type, e.g. HOME_IMPROVEMENT)"
               placeholderTextColor={colors.mutedForeground}
               value={budgetCategory}
               onChangeText={setBudgetCategory}
@@ -382,7 +448,7 @@ export default function InsightsScreen() {
               autoCapitalize="none"
             />
             <TextInput
-              placeholder="Monthly limit (USD)"
+              placeholder={`Monthly limit (${budgetCurrency})`}
               placeholderTextColor={colors.mutedForeground}
               value={budgetLimit}
               onChangeText={setBudgetLimit}
@@ -739,6 +805,34 @@ const styles = StyleSheet.create({
   budgetForm: {
     marginTop: 14,
     gap: 10,
+  },
+  budgetChipRow: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 8,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  budgetChip: {
+    maxWidth: 200,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  budgetChipOn: {
+    borderColor: colors.accent,
+    backgroundColor: "rgba(234, 122, 83, 0.12)",
+  },
+  budgetChipText: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 12,
+    color: colors.mutedForeground,
+  },
+  budgetChipTextOn: {
+    color: colors.accent,
   },
   budgetInput: {
     borderWidth: StyleSheet.hairlineWidth,
