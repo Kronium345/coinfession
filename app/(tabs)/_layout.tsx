@@ -4,12 +4,14 @@ import { tabs } from "@/constants/data";
 import { colours, components } from "@/constants/theme";
 import { cx } from "@/lib/tw";
 import { Redirect, Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Image, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconProps = {
     focused: boolean;
     icon: any;
+    ionIcon?: string;
 };
 
 const tabBar = components.tabBar;
@@ -26,11 +28,26 @@ const TabsLayout = () => {
         return <Redirect href="/(auth)/sign-in" />;
     }
 
-    const TabIcon = ({ focused, icon }: TabIconProps) => {
+    const TabIcon = ({ focused, icon, ionIcon }: TabIconProps) => {
         return (
             <View style={cx("tabs-icon")}>
                 <View style={cx("tabs-pill", focused && "tabs-active")}>
-                    <Image source={icon} style={cx("tabs-glyph")} resizeMode="contain" />
+                    {ionIcon ? (
+                        <Ionicons
+                            name={ionIcon as any}
+                            size={24}
+                            color={focused ? colours.primary : "rgba(255,255,255,0.92)"}
+                        />
+                    ) : (
+                        <Image
+                            source={icon}
+                            style={[
+                                cx("tabs-glyph"),
+                                { tintColor: focused ? colours.primary : "rgba(255,255,255,0.92)" },
+                            ]}
+                            resizeMode="contain"
+                        />
+                    )}
                 </View>
             </View>
         )
@@ -66,7 +83,7 @@ const TabsLayout = () => {
                 options={{
                     title: tab.title,
                     tabBarIcon: ({ focused }) => (
-                        <TabIcon focused={focused} icon={tab.icon} />
+                        <TabIcon focused={focused} icon={tab.icon} ionIcon={tab.ionIcon} />
                     )
                 }} />
         ))}

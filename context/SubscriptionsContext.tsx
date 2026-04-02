@@ -1,5 +1,10 @@
 import { HOME_SUBSCRIPTIONS } from "@/constants/data";
-import { createSubscription, listSubscriptions, type ApiSubscription } from "@/lib/api";
+import {
+  createSubscription,
+  listSubscriptions,
+  toUserFriendlyErrorMessage,
+  type ApiSubscription,
+} from "@/lib/api";
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
 import { useAuth } from "@clerk/expo";
 import {
@@ -67,7 +72,7 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
       setSubscriptions(remote.map(mapApiSubscription));
       setSyncError(null);
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : "Failed to sync subscriptions.");
+      setSyncError(toUserFriendlyErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

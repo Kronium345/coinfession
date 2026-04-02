@@ -1,7 +1,44 @@
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+function normalizeBaseUrl(raw: string) {
+  const trimmed = raw.trim();
+  return trimmed.endsWith("/") ? trimmed.replace(/\/+$/, "") : trimmed;
+}
+
+export const API_BASE_URL = normalizeBaseUrl(
+  process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:4000"
+);
 
 type GetToken = () => Promise<string | null>;
+
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(status: number, message: string, options?: { code?: string }) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = options?.code;
+  }
+}
+
+export function toUserFriendlyErrorMessage(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 404) {
+      return "Can’t reach the server right now. Check your API URL and try again.";
+    }
+    if (error.status === 401) {
+      return "Your session expired. Please sign in again.";
+    }
+    if (error.status >= 500) {
+      return "Server error. Please try again in a moment.";
+    }
+    return error.message || "Request failed.";
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Something went wrong. Please try again.";
+}
 
 async function authFetch<T>(
   getToken: GetToken,
@@ -20,13 +57,15 @@ async function authFetch<T>(
 
   if (!response.ok) {
     let detail = response.statusText;
+    let code: string | undefined;
     try {
-      const json = (await response.json()) as { message?: string };
+      const json = (await response.json()) as { message?: string; code?: string };
       detail = json.message ?? detail;
+      code = json.code;
     } catch {
       // Ignore parse failures and keep fallback detail.
     }
-    throw new Error(`Request failed (${response.status}): ${detail}`);
+    throw new ApiRequestError(response.status, detail, { code });
   }
 
   return (await response.json()) as T;

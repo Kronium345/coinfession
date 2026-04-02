@@ -4,7 +4,8 @@ declare global {
     interface AppTab {
         name: string;
         title: string;
-        icon: ImageSourcePropType;
+        icon?: ImageSourcePropType;
+        ionIcon?: string;
     }
 
     interface TabIconProps {

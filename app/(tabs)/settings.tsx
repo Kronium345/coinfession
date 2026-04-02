@@ -8,20 +8,24 @@ import {
 import { cx } from "@/lib/tw";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
+import { useUserProfileModal } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import images from "@/constants/images";
 export default function SettingsScreen() {
   const { signOut } = useClerk();
   const { user } = useUser();
   const { getToken } = useAuth();
+  const { presentUserProfile, isAvailable } = useUserProfileModal();
   const getTokenRef = useRef(getToken);
   const hasBootstrappedRef = useRef(false);
   const posthog = usePostHog();
@@ -137,6 +141,37 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={cx("auth-title")}>Settings</Text>
+
+        <View style={cx("auth-card")}>
+          <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>Profile</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Image
+              source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
+              style={{ width: 44, height: 44, borderRadius: 22 }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={cx("auth-label")}>
+                {user?.firstName || user?.username || "User"}
+              </Text>
+              <Text style={cx("auth-helper")}>
+                {user?.primaryEmailAddress?.emailAddress ?? "No email on file"}
+              </Text>
+            </View>
+          </View>
+          <Pressable
+            onPress={() => void presentUserProfile()}
+            disabled={!isAvailable}
+            style={[
+              cx("auth-button"),
+              { marginTop: 14 },
+              !isAvailable ? { opacity: 0.6 } : null,
+            ]}
+          >
+            <Text style={cx("auth-button-text")}>
+              {isAvailable ? "Edit profile photo/details" : "Profile unavailable"}
+            </Text>
+          </Pressable>
+        </View>
 
         <View style={cx("auth-card")}>
           <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>Linked banks (Plaid)</Text>

@@ -1,35 +1,40 @@
 import { useSubscriptions } from "@/context/SubscriptionsContext";
-import { listTransactions, type NormalizedTransaction } from "@/lib/api";
+import { listTransactions, toUserFriendlyErrorMessage, type NormalizedTransaction } from "@/lib/api";
 import { shareTransactionsAsCsv } from "@/lib/exportCsv";
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
 import { cx } from "@/lib/tw";
 import { useAuth } from "@clerk/expo";
 import dayjs from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../theme";
 
 export default function TransactionsScreen() {
   const { getToken } = useAuth();
+  const getTokenRef = useRef(getToken);
   const { addSubscription } = useSubscriptions();
   const [items, setItems] = useState<NormalizedTransaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
 
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await listTransactions(getToken, { limit: 100 });
+      const response = await listTransactions(getTokenRef.current, { limit: 100 });
       setItems(response.items.filter((i) => i.sourceType === "bank_sync"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load transactions.");
+      setError(toUserFriendlyErrorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, []);
 
   useEffect(() => {
     void load();

@@ -20,7 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@clerk/expo";
 import { useRouter } from "expo-router";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -33,6 +33,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, fonts } from "../../theme";
+import { toUserFriendlyErrorMessage } from "@/lib/api";
 
 const CHART_HEIGHT = 140;
 const Y_TICK_COUNT = 5;
@@ -40,6 +41,7 @@ const Y_TICK_COUNT = 5;
 export default function InsightsScreen() {
   const router = useRouter();
   const { getToken, isLoaded, isSignedIn } = useAuth();
+  const getTokenRef = useRef(getToken);
   const { subscriptions } = useSubscriptions();
   const [now] = useState(() => dayjs());
   const [insightSummary, setInsightSummary] = useState<InsightSummary | null>(null);
@@ -102,19 +104,23 @@ export default function InsightsScreen() {
   const goSubscriptions = () => router.push("/subscriptions");
 
   useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
+
+  useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
     let active = true;
     const load = async () => {
       try {
-        const summary = await getInsightsSummary(getToken);
+        const summary = await getInsightsSummary(getTokenRef.current);
         if (active) {
           setInsightSummary(summary);
           setInsightError(null);
         }
       } catch (error) {
         if (active) {
-          setInsightError(error instanceof Error ? error.message : "Failed to load insights.");
+          setInsightError(toUserFriendlyErrorMessage(error));
         }
       }
     };
@@ -123,10 +129,10 @@ export default function InsightsScreen() {
     return () => {
       active = false;
     };
-  }, [getToken, isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn]);
 
   const refreshInsightSummary = async () => {
-    const summary = await getInsightsSummary(getToken);
+    const summary = await getInsightsSummary(getTokenRef.current);
     setInsightSummary(summary);
   };
 
@@ -135,7 +141,7 @@ export default function InsightsScreen() {
     if (!budgetCategory.trim() || !Number.isFinite(limit) || limit <= 0) return;
     setBudgetBusy(true);
     try {
-      await upsertBudget(getToken, { category: budgetCategory.trim(), monthlyLimit: limit });
+      await upsertBudget(getTokenRef.current, { category: budgetCategory.trim(), monthlyLimit: limit });
       await refreshInsightSummary();
       setBudgetCategory("");
       setBudgetLimit("");
@@ -148,7 +154,7 @@ export default function InsightsScreen() {
 
   const onDeleteBudget = async (id: string) => {
     try {
-      await deleteBudget(getToken, id);
+      await deleteBudget(getTokenRef.current, id);
       await refreshInsightSummary();
     } catch (e) {
       setInsightError(e instanceof Error ? e.message : "Could not remove budget.");

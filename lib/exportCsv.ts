@@ -3,7 +3,6 @@ import {
   documentDirectory,
   writeAsStringAsync,
 } from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
 
 import type { NormalizedTransaction } from "./api";
 
@@ -34,8 +33,22 @@ export async function shareTransactionsAsCsv(rows: NormalizedTransaction[]): Pro
   }
   const uri = `${base}coinfession-transactions-${Date.now()}.csv`;
   await writeAsStringAsync(uri, body);
+
+  // Lazy-load to avoid crashing in runtimes without the native module (e.g. Expo Go).
+  let Sharing: typeof import("expo-sharing");
+  try {
+    Sharing = await import("expo-sharing");
+  } catch {
+    throw new Error(
+      "CSV export requires expo-sharing in a development build (or production build). Rebuild the app to enable it."
+    );
+  }
+
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error("Sharing is not available on this device.");
   }
-  await Sharing.shareAsync(uri, { mimeType: "text/csv", dialogTitle: "Export transactions" });
+  await Sharing.shareAsync(uri, {
+    mimeType: "text/csv",
+    dialogTitle: "Export transactions",
+  });
 }
