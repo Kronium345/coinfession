@@ -215,6 +215,7 @@ export function exchangePlaidPublicToken(
   getToken: GetToken,
   body: {
     publicToken: string;
+    countryCode?: "US" | "GB";
     metadata?: {
       institution?: { institution_id?: string; name?: string };
       accounts?: { id: string }[];
@@ -231,6 +232,7 @@ export function exchangePlaidPublicToken(
     method: "POST",
     body: JSON.stringify({
       publicToken: body.publicToken,
+      countryCode: body.countryCode,
       metadata: body.metadata,
     }),
   });
@@ -257,6 +259,7 @@ export type BankConnection = {
   clerkUserId: string;
   provider: string;
   itemId: string;
+  countryCode?: "US" | "GB" | null;
   institutionId?: string | null;
   institutionName?: string | null;
   plaidAccountIds?: string[];

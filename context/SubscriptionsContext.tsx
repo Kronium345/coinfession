@@ -1,10 +1,12 @@
-import { HOME_SUBSCRIPTIONS } from "@/constants/data";
 import {
   createSubscription,
+  listBankConnections,
   listSubscriptions,
   toUserFriendlyErrorMessage,
   type ApiSubscription,
+  type BankConnection,
 } from "@/lib/api";
+import { preferredCurrencyFromBankConnections } from "@/lib/linkedBankCurrency";
 import {
   clearRenewalScheduledNotifications,
   syncSubscriptionRenewalReminders,
@@ -31,6 +33,9 @@ type SubscriptionsContextValue = {
   isLoading: boolean;
   syncError: string | null;
   refreshSubscriptions: () => Promise<void>;
+  /** ISO currency from the most recently linked bank (US → USD, UK → GBP), else USD. */
+  preferredCurrency: string;
+  refreshLinkedBankMetadata: () => Promise<void>;
   renewalRemindersEnabled: boolean;
   setRenewalRemindersEnabled: (value: boolean) => void;
   renewalRemindersPrefLoaded: boolean;
@@ -44,12 +49,8 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const getTokenRef = useRef(getToken);
   const hasBootstrappedRef = useRef(false);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(() =>
-    HOME_SUBSCRIPTIONS.map((s) => ({
-      ...s,
-      icon: resolveSubscriptionIcon(s.name),
-    }))
-  );
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [bankConnections, setBankConnections] = useState<BankConnection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [renewalRemindersEnabled, setRenewalRemindersEnabledState] = useState(true);
@@ -112,16 +113,32 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
     }
   }, [mapApiSubscription]);
 
+  const refreshLinkedBankMetadata = useCallback(async () => {
+    try {
+      const rows = await listBankConnections(getTokenRef.current);
+      setBankConnections(rows);
+    } catch {
+      setBankConnections([]);
+    }
+  }, []);
+
+  const preferredCurrency = useMemo(
+    () => preferredCurrencyFromBankConnections(bankConnections),
+    [bankConnections]
+  );
+
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
       hasBootstrappedRef.current = false;
+      setSubscriptions([]);
+      setBankConnections([]);
       return;
     }
     if (hasBootstrappedRef.current) return;
     hasBootstrappedRef.current = true;
-    void refreshSubscriptions();
-  }, [isLoaded, isSignedIn, refreshSubscriptions]);
+    void Promise.all([refreshSubscriptions(), refreshLinkedBankMetadata()]);
+  }, [isLoaded, isSignedIn, refreshSubscriptions, refreshLinkedBankMetadata]);
 
   useEffect(() => {
     if (!renewalRemindersPrefLoaded || !isLoaded || !isSignedIn) return;
@@ -170,6 +187,8 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
       isLoading,
       syncError,
       refreshSubscriptions,
+      preferredCurrency,
+      refreshLinkedBankMetadata,
       renewalRemindersEnabled,
       setRenewalRemindersEnabled,
       renewalRemindersPrefLoaded,
@@ -180,6 +199,8 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
       isLoading,
       syncError,
       refreshSubscriptions,
+      preferredCurrency,
+      refreshLinkedBankMetadata,
       renewalRemindersEnabled,
       setRenewalRemindersEnabled,
       renewalRemindersPrefLoaded,

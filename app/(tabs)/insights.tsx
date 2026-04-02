@@ -31,7 +31,8 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, fonts } from "../../theme";
 import { toUserFriendlyErrorMessage } from "@/lib/api";
 
@@ -40,6 +41,7 @@ const Y_TICK_COUNT = 5;
 
 export default function InsightsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const getTokenRef = useRef(getToken);
   const { subscriptions } = useSubscriptions();
@@ -178,7 +180,10 @@ export default function InsightsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabBarScrollPaddingBottom(insets.bottom) },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -549,7 +554,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 120,
     paddingTop: 8,
   },
   header: {

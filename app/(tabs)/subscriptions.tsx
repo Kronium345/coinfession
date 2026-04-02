@@ -1,6 +1,7 @@
 import SubscriptionCard from "@/components/SubscriptionCard";
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { cx } from "@/lib/tw";
+import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
 import { useMemo, useState } from "react";
 import {
   FlatList,
@@ -10,10 +11,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../theme";
 
 export default function SubscriptionsScreen() {
+  const insets = useSafeAreaInsets();
   const { subscriptions, isLoading, syncError } = useSubscriptions();
   const [query, setQuery] = useState("");
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
@@ -69,7 +71,7 @@ export default function SubscriptionsScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ItemSeparatorComponent={() => <View style={cx("h-4")} />}
-          contentContainerStyle={cx("pb-30")}
+          contentContainerStyle={{ paddingBottom: tabBarScrollPaddingBottom(insets.bottom) }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={cx("home-empty-state")}>

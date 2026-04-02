@@ -1,17 +1,19 @@
 import CreateSubscriptionModal from "@/components/CreateSubscriptionModal";
 import ListHeading from "@/components/ListHeading";
+import ProfileAvatar from "@/components/ProfileAvatar";
 import SubscriptionCard from "@/components/SubscriptionCard";
 import UpcomingSubsCard from "@/components/UpcomingSubsCard";
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { icons } from "@/constants/icons";
-import images from "@/constants/images";
 import { cx } from "@/lib/tw";
+import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
 import { formatCurrency, formatNextRenewalCaption } from "@/lib/utils";
 import { useUser } from "@clerk/expo";
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import tw from "twrnc";
 import { colors, fonts } from "../../theme";
 
@@ -19,9 +21,18 @@ import { colors, fonts } from "../../theme";
 export default function App() {
 
   const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<string | null>(null);
-  const { subscriptions, addSubscription, isLoading, syncError } = useSubscriptions();
+  const { subscriptions, addSubscription, isLoading, syncError, preferredCurrency } =
+    useSubscriptions();
   const { user } = useUser();
+  const insets = useSafeAreaInsets();
   const [createModalVisible, setCreateModalVisible] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) void user.reload();
+    }, [user])
+  );
+
   const homeBalance = useMemo(() => {
     const countsTowardTotal = (s: Subscription) => {
       const st = s.status?.toLowerCase().trim();
@@ -32,7 +43,7 @@ export default function App() {
     const yearly = (billing: string) => /year|annual/i.test(billing ?? "");
 
     let monthlyTotal = 0;
-    const currency = active[0]?.currency ?? "USD";
+    const currency = active[0]?.currency ?? preferredCurrency;
     for (const s of active) {
       monthlyTotal += yearly(s.billing) ? s.price / 12 : s.price;
     }
@@ -44,7 +55,7 @@ export default function App() {
       .sort((a, b) => a.at.valueOf() - b.at.valueOf())[0]?.sub.renewalDate ?? null;
 
     return { monthlyTotal, currency, nextRenewal };
-  }, [subscriptions]);
+  }, [subscriptions, preferredCurrency]);
 
   const upcomingSubscriptions = useMemo<UpcomingSubscription[]>(() => {
     const now = dayjs();
@@ -59,7 +70,7 @@ export default function App() {
           icon: sub.icon,
           name: sub.name,
           price: sub.price,
-          currency: sub.currency ?? "USD",
+          currency: sub.currency ?? preferredCurrency,
           daysLeft,
           renewalTs: renewal.valueOf(),
         };
@@ -68,7 +79,7 @@ export default function App() {
       .sort((a, b) => a.renewalTs - b.renewalTs)
       .slice(0, 6)
       .map(({ renewalTs, ...sub }) => sub);
-  }, [subscriptions]);
+  }, [subscriptions, preferredCurrency]);
 
   return (
     <SafeAreaView style={[tw`flex-1 px-5 pt-2`, { backgroundColor: colors.background }]}>
@@ -76,16 +87,14 @@ export default function App() {
         visible={createModalVisible}
         onClose={() => setCreateModalVisible(false)}
         onCreate={addSubscription}
+        defaultCurrency={preferredCurrency}
       />
       <FlatList
         ListHeaderComponent={() => (
           <>
             <View style={cx("home-header")}>
               <View style={cx("home-user")}>
-                <Image
-                  source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
-                  style={cx("home-avatar")}
-                />
+                <ProfileAvatar imageUrl={user?.imageUrl} style={cx("home-avatar")} />
                 <Text style={cx("home-user-name")}>
                   {user?.firstName?.trim() ||
                     user?.username ||
@@ -141,7 +150,7 @@ export default function App() {
         ItemSeparatorComponent={() => <View style={cx("h-4")} />}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<Text style={cx("home-empty-state")}>No subscriptions yet.</Text>}
-        contentContainerStyle={cx("pb-30")}
+        contentContainerStyle={{ paddingBottom: tabBarScrollPaddingBottom(insets.bottom) }}
       />
     </SafeAreaView>
   );

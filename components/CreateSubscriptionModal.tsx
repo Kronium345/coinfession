@@ -1,6 +1,7 @@
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
 import { cx } from "@/lib/tw";
 import clsx from "clsx";
+import { toast } from "burnt";
 import dayjs from "dayjs";
 import { usePostHog } from "posthog-react-native";
 import { useCallback, useMemo, useState } from "react";
@@ -45,6 +46,7 @@ type CreateSubscriptionModalProps = {
   visible: boolean;
   onClose: () => void;
   onCreate: (subscription: Subscription) => Promise<void>;
+  defaultCurrency?: string;
 };
 
 function tokensFromClsx(...args: Parameters<typeof clsx>) {
@@ -57,6 +59,7 @@ export default function CreateSubscriptionModal({
   visible,
   onClose,
   onCreate,
+  defaultCurrency = "USD",
 }: CreateSubscriptionModalProps) {
   const posthog = usePostHog();
   const [name, setName] = useState("");
@@ -109,7 +112,7 @@ export default function CreateSubscriptionModal({
       id,
       name: name.trim(),
       price: priceNumber,
-      currency: "USD",
+      currency: defaultCurrency,
       billing: frequency,
       category,
       plan: category,
@@ -127,6 +130,11 @@ export default function CreateSubscriptionModal({
         subscription_price: subscription.price,
         subscription_frequency: subscription.billing,
         subscription_category: subscription.category ?? "Other",
+      });
+      toast({
+        title: "Subscription added",
+        preset: "done",
+        message: subscription.name,
       });
       reset();
       onClose();

@@ -5,30 +5,32 @@ import {
   syncBankTransactions,
   type BankConnection,
 } from "@/lib/api";
+import ProfileAvatar from "@/components/ProfileAvatar";
 import { useSubscriptions } from "@/context/SubscriptionsContext";
 import { cx } from "@/lib/tw";
+import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { useUserProfileModal } from "@clerk/expo";
 import { usePostHog } from "posthog-react-native";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   Switch,
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import images from "@/constants/images";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../theme";
 
 export default function SettingsScreen() {
   const { signOut } = useClerk();
   const { user } = useUser();
   const { getToken } = useAuth();
+  const insets = useSafeAreaInsets();
   const { presentUserProfile, isAvailable } = useUserProfileModal();
   const getTokenRef = useRef(getToken);
   const hasBootstrappedRef = useRef(false);
@@ -37,8 +39,14 @@ export default function SettingsScreen() {
     renewalRemindersEnabled,
     setRenewalRemindersEnabled,
     renewalRemindersPrefLoaded,
+    refreshLinkedBankMetadata,
   } = useSubscriptions();
-  const { startLink, busy: plaidBusy, error: plaidError, clearError } = usePlaidLink();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) void user.reload();
+    }, [user])
+  );
   const [connections, setConnections] = useState<BankConnection[]>([]);
   const [loadingConnections, setLoadingConnections] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
@@ -77,6 +85,15 @@ export default function SettingsScreen() {
       setLoadingConnections(false);
     }
   }, []);
+
+  const onAfterPlaidExchange = useCallback(() => {
+    void refreshLinkedBankMetadata();
+    void refreshConnections();
+  }, [refreshLinkedBankMetadata, refreshConnections]);
+
+  const { startLink, busy: plaidBusy, error: plaidError, clearError } = usePlaidLink({
+    onAfterExchange: onAfterPlaidExchange,
+  });
 
   useEffect(() => {
     if (hasBootstrappedRef.current) return;
@@ -145,7 +162,10 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={cx("auth-safe-area")} edges={["top"]}>
       <ScrollView
-        contentContainerStyle={[cx("auth-content"), { paddingBottom: 48 }]}
+        contentContainerStyle={[
+          cx("auth-content"),
+          { paddingBottom: tabBarScrollPaddingBottom(insets.bottom) },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -154,8 +174,8 @@ export default function SettingsScreen() {
         <View style={cx("auth-card")}>
           <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>Profile</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Image
-              source={user?.imageUrl ? { uri: user.imageUrl } : images.avatar}
+            <ProfileAvatar
+              imageUrl={user?.imageUrl}
               style={{ width: 44, height: 44, borderRadius: 22 }}
             />
             <View style={{ flex: 1 }}>
@@ -195,8 +215,8 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={cx("auth-label")}>Renewal reminders</Text>
               <Text style={[cx("auth-helper"), { marginTop: 4 }]}>
-                Schedules a local alert one day before each active subscription renews. In Expo Go,
-                this is skipped (use a dev/production build). The toggle is still saved on this device.
+                Schedules a local alert one day before each active subscription renews. Your choice is
+                saved on this device.
               </Text>
             </View>
             <Switch
@@ -221,7 +241,7 @@ export default function SettingsScreen() {
             <ActivityIndicator style={{ marginBottom: 12 }} />
           ) : connections.length === 0 ? (
             <Text style={[cx("auth-helper"), { marginBottom: 12 }]}>
-              No bank connections yet. Use a development build (not Expo Go) for Plaid Link.
+              No bank connections yet. Connect a US or UK account below.
             </Text>
           ) : (
             <View style={{ gap: 10, marginBottom: 12 }}>

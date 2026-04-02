@@ -10,7 +10,11 @@ import { useCallback, useState } from "react";
 import { Platform } from "react-native";
 import { create, open, type LinkExit, type LinkSuccess } from "react-native-plaid-link-sdk";
 
-export function usePlaidLink() {
+export type UsePlaidLinkOptions = {
+  onAfterExchange?: () => void;
+};
+
+export function usePlaidLink(options?: UsePlaidLinkOptions) {
   const { getToken } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +41,7 @@ export function usePlaidLink() {
             try {
               await exchangePlaidPublicToken(getToken, {
                 publicToken: success.publicToken,
+                countryCode,
                 metadata: {
                   institution: success.metadata.institution
                     ? {
@@ -49,6 +54,7 @@ export function usePlaidLink() {
               });
               await syncBankTransactions(getToken);
               await recomputeInsights(getToken);
+              options?.onAfterExchange?.();
             } catch (err) {
               setError(
                 err instanceof Error ? err.message : "Link succeeded but server exchange/sync failed."
@@ -71,7 +77,7 @@ export function usePlaidLink() {
         setError(err instanceof Error ? err.message : "Could not start Plaid Link.");
       }
     },
-    [getToken]
+    [getToken, options?.onAfterExchange]
   );
 
   return { startLink, busy, error, clearError };

@@ -22,10 +22,12 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
 import { colors } from "../../theme";
 
 export default function TransactionsScreen() {
+  const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
   const getTokenRef = useRef(getToken);
   const { addSubscription } = useSubscriptions();
@@ -193,7 +195,7 @@ export default function TransactionsScreen() {
         data={items}
         keyExtractor={(item) => item._id}
         ItemSeparatorComponent={() => <View style={cx("h-3")} />}
-        contentContainerStyle={cx("pb-30")}
+        contentContainerStyle={{ paddingBottom: tabBarScrollPaddingBottom(insets.bottom) }}
         ListEmptyComponent={<Text style={cx("home-empty-state")}>No synced transactions yet.</Text>}
         renderItem={({ item }) => (
           <View style={cx("auth-card")}>

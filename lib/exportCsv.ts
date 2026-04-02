@@ -34,14 +34,11 @@ export async function shareTransactionsAsCsv(rows: NormalizedTransaction[]): Pro
   const uri = `${base}coinfession-transactions-${Date.now()}.csv`;
   await writeAsStringAsync(uri, body);
 
-  // Lazy-load to avoid crashing in runtimes without the native module (e.g. Expo Go).
   let Sharing: typeof import("expo-sharing");
   try {
     Sharing = await import("expo-sharing");
   } catch {
-    throw new Error(
-      "CSV export requires expo-sharing in a development build (or production build). Rebuild the app to enable it."
-    );
+    throw new Error("Sharing isn’t available in this build. Try again from the installed app.");
   }
 
   if (!(await Sharing.isAvailableAsync())) {
