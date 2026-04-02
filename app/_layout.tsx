@@ -1,8 +1,7 @@
-import "@/lib/notifications";
 import { ClerkProvider } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
-import * as Notifications from "expo-notifications";
+import { initNotificationHandler, notificationsNativeAvailable } from "@/lib/notifications";
 import { SplashScreen, Stack, useRouter } from "expo-router";
 import { PostHogProvider } from "posthog-react-native";
 import { useEffect } from "react";
@@ -20,26 +19,45 @@ function NotificationDeepLink() {
   const router = useRouter();
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
+    if (Platform.OS === "web") {
+      return;
+    }
 
-    const open = (n: Notifications.Notification) => {
-      const url = n.request.content.data?.url;
-      if (typeof url === "string" && url.length > 0) {
-        router.push(url as never);
+    let cancelled = false;
+    let subscription: { remove: () => void } | undefined;
+
+    void (async () => {
+      try {
+        const Notifications = await import("expo-notifications");
+        if (cancelled) {
+          return;
+        }
+
+        const open = (n: import("expo-notifications").Notification) => {
+          const url = n.request.content.data?.url;
+          if (typeof url === "string" && url.length > 0) {
+            router.push(url as never);
+          }
+        };
+
+        const last = await Notifications.getLastNotificationResponseAsync();
+        if (!cancelled && last?.notification) {
+          open(last.notification);
+          void Notifications.clearLastNotificationResponseAsync();
+        }
+
+        subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+          open(response.notification);
+        });
+      } catch {
+        /* Expo Go / missing native module — ignore */
       }
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription?.remove();
     };
-
-    void Notifications.getLastNotificationResponseAsync().then((last) => {
-      if (last?.notification) {
-        open(last.notification);
-        void Notifications.clearLastNotificationResponseAsync();
-      }
-    });
-
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      open(response.notification);
-    });
-    return () => sub.remove();
   }, [router]);
 
   return null;
@@ -61,9 +79,14 @@ export default function RootLayout() {
     }
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  useEffect(() => {
+    if (!fontsLoaded || Platform.OS === "web") {
+      return;
+    }
+    if (notificationsNativeAvailable()) {
+      void initNotificationHandler();
+    }
+  }, [fontsLoaded]);
 
   return (
     <PostHogProvider
@@ -71,8 +94,12 @@ export default function RootLayout() {
       options={{ host: process.env.EXPO_PUBLIC_POSTHOG_HOST }}
     >
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-        <NotificationDeepLink />
-        <Stack screenOptions={{ headerShown: false }} />
+        {fontsLoaded ? (
+          <>
+            <NotificationDeepLink />
+            <Stack screenOptions={{ headerShown: false }} />
+          </>
+        ) : null}
       </ClerkProvider>
     </PostHogProvider>
   );

@@ -195,8 +195,8 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={cx("auth-label")}>Renewal reminders</Text>
               <Text style={[cx("auth-helper"), { marginTop: 4 }]}>
-                Schedules a local notification one day before each active subscription renews. Uses
-                this device only; rebuild after enabling the notifications plugin if needed.
+                Schedules a local alert one day before each active subscription renews. In Expo Go,
+                this is skipped (use a dev/production build). The toggle is still saved on this device.
               </Text>
             </View>
             <Switch

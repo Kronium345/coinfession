@@ -10,8 +10,8 @@ import {
   syncSubscriptionRenewalReminders,
 } from "@/lib/notifications";
 import { resolveSubscriptionIcon } from "@/lib/resolveSubscriptionIcon";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@clerk/expo";
+import * as SecureStore from "expo-secure-store";
 import {
   createContext,
   useCallback,
@@ -23,7 +23,7 @@ import {
   type ReactNode,
 } from "react";
 
-const RENEWAL_PREFS_KEY = "@coinfession/renewal_reminders_enabled";
+const RENEWAL_PREFS_KEY = "coinfession_renewal_reminders_enabled";
 
 type SubscriptionsContextValue = {
   subscriptions: Subscription[];
@@ -56,17 +56,25 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
   const [renewalRemindersPrefLoaded, setRenewalRemindersPrefLoaded] = useState(false);
 
   useEffect(() => {
-    void AsyncStorage.getItem(RENEWAL_PREFS_KEY).then((v) => {
-      if (v === "false") {
-        setRenewalRemindersEnabledState(false);
+    void (async () => {
+      try {
+        const v = await SecureStore.getItemAsync(RENEWAL_PREFS_KEY);
+        if (v === "false") {
+          setRenewalRemindersEnabledState(false);
+        }
+      } catch {
+        /* missing native secure store (e.g. some web builds) */
+      } finally {
+        setRenewalRemindersPrefLoaded(true);
       }
-      setRenewalRemindersPrefLoaded(true);
-    });
+    })();
   }, []);
 
   const setRenewalRemindersEnabled = useCallback((next: boolean) => {
     setRenewalRemindersEnabledState(next);
-    void AsyncStorage.setItem(RENEWAL_PREFS_KEY, next ? "true" : "false");
+    void SecureStore.setItemAsync(RENEWAL_PREFS_KEY, next ? "true" : "false").catch(() => {
+      /* ignore persist failure */
+    });
   }, []);
 
   useEffect(() => {
