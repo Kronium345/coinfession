@@ -182,6 +182,7 @@ export default function SignInScreen() {
                 disabled={busy}
                 style={({ pressed }) => [
                   cx("auth-button", busy && "auth-button-disabled"),
+                  { marginTop: 24, marginBottom: 20 },
                   pressed && !busy ? { opacity: 0.92 } : null,
                 ]}
               >
@@ -271,6 +272,7 @@ export default function SignInScreen() {
                   "auth-button",
                   (!canSubmitSignIn || busy) && "auth-button-disabled"
                 ),
+                { marginTop: 24, marginBottom: 20 },
                 pressed && canSubmitSignIn && !busy ? { opacity: 0.92 } : null,
               ]}
             >
@@ -280,7 +282,7 @@ export default function SignInScreen() {
               Your data stays encrypted in transit. We never sell personal
               information.
             </Text>
-            <View style={cx("auth-link-row")}>
+            <View style={[cx("auth-link-row"), { marginTop: 28, marginBottom: 24 }]}>
               <Text style={cx("auth-link-copy")}>New here?</Text>
               <Link href="/(auth)/sign-up" asChild>
                 <Pressable>

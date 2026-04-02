@@ -167,13 +167,12 @@ export default function SignUpScreen() {
                   <Text style={cx("auth-error")}>{codeError}</Text>
                 ) : null}
               </View>
-              <View style={{ marginTop: 14, gap: 10 }}>
+              <View style={{ marginTop: 24, gap: 10, marginBottom: 24 }}>
                 <Pressable
                   onPress={onVerify}
                   disabled={busy}
                   style={({ pressed }) => [
                     cx("auth-button", busy && "auth-button-disabled"),
-                    { marginTop: 0 },
                     pressed && !busy ? { opacity: 0.92 } : null,
                   ]}
                 >
@@ -278,6 +277,7 @@ export default function SignUpScreen() {
               disabled={!canStart}
               style={({ pressed }) => [
                 cx("auth-button", (!canStart || busy) && "auth-button-disabled"),
+                { marginTop: 24, marginBottom: 20 },
                 pressed && canStart && !busy ? { opacity: 0.92 } : null,
               ]}
             >
@@ -287,7 +287,7 @@ export default function SignUpScreen() {
               By continuing you agree to sensible checks that protect this
               community from abuse.
             </Text>
-            <View style={cx("auth-link-row")}>
+            <View style={[cx("auth-link-row"), { marginTop: 28, marginBottom: 24 }]}>
               <Text style={cx("auth-link-copy")}>Already have an account?</Text>
               <Link href="/(auth)/sign-in" asChild>
                 <Pressable>
