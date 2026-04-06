@@ -11,7 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kronium.coinfession",
-      "associatedDomains": ["applinks:coinfession.app"],
+      "associatedDomains": [
+        "applinks:vercel-redirect-project-two.vercel.app"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
