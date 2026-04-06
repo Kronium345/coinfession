@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth-validation";
 import { cx } from "@/lib/tw";
 import { useAuth, useSignUp } from "@clerk/expo";
-import { type Href, Link, useRouter } from "expo-router";
+import { type Href, Link, Redirect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -102,7 +102,7 @@ export default function SignUpScreen() {
   };
 
   if (signUp.status === "complete" || isSignedIn) {
-    return null;
+    return <Redirect href="/(tabs)" />;
   }
 
   const awaitingEmailCode =

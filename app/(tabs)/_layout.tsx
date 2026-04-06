@@ -5,7 +5,13 @@ import { colours, components } from "@/constants/theme";
 import { cx } from "@/lib/tw";
 import { Redirect, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Image, KeyboardAvoidingView, Platform, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type TabIconProps = {
@@ -21,7 +27,13 @@ const TabsLayout = () => {
     const insets = useSafeAreaInsets();
 
     if (!isLoaded) {
-        return null;
+        return (
+            <View
+                style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+            >
+                <ActivityIndicator size="large" />
+            </View>
+        );
     }
 
     if (!isSignedIn) {

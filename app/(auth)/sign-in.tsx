@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth-validation";
 import { cx } from "@/lib/tw";
 import { useAuth, useSignIn } from "@clerk/expo";
-import { type Href, Link, useRouter } from "expo-router";
+import { type Href, Link, Redirect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -118,7 +118,7 @@ export default function SignInScreen() {
   };
 
   if (isSignedIn) {
-    return null;
+    return <Redirect href="/(tabs)" />;
   }
 
   const clerkIdentifierError = errors.fields?.identifier?.message as
