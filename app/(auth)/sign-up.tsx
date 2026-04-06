@@ -5,6 +5,7 @@ import {
   validatePassword,
   validateVerificationCode,
 } from "@/lib/auth-validation";
+import { clerkErrorToMessage, logClerkAuth } from "@/lib/clerkErrors";
 import { cx } from "@/lib/tw";
 import { useAuth, useSignUp } from "@clerk/expo";
 import { type Href, Link, Redirect, useRouter } from "expo-router";
@@ -36,6 +37,7 @@ export default function SignUpScreen() {
     null
   );
   const [localCodeError, setLocalCodeError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const busy = fetchStatus === "fetching";
 
@@ -52,6 +54,7 @@ export default function SignUpScreen() {
   );
 
   const onStartSignUp = async () => {
+    setGeneralError(null);
     setLocalEmailError(null);
     setLocalPasswordError(null);
 
@@ -65,20 +68,52 @@ export default function SignUpScreen() {
       return;
     }
 
-    const { error } = await signUp.password({
-      emailAddress: email.trim(),
-      password,
-      firstName: firstName.trim() || undefined,
-      lastName: lastName.trim() || undefined,
-    });
-    if (error) {
-      return;
+    if (__DEV__) {
+      console.log("[Clerk sign-up] calling signUp.password()");
     }
 
-    await signUp.verifications.sendEmailCode();
+    try {
+      const { error: passwordError } = await signUp.password({
+        emailAddress: email.trim(),
+        password,
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+      });
+
+      if (passwordError) {
+        logClerkAuth("signUp.password", passwordError);
+        setGeneralError(clerkErrorToMessage(passwordError));
+        return;
+      }
+
+      if (__DEV__) {
+        console.log("[Clerk sign-up] password OK, sending email code");
+      }
+
+      const sendResult = await signUp.verifications.sendEmailCode();
+      const sendErr =
+        sendResult &&
+        typeof sendResult === "object" &&
+        "error" in sendResult &&
+        (sendResult as { error?: unknown }).error;
+
+      if (sendErr) {
+        logClerkAuth("signUp.verifications.sendEmailCode", sendErr);
+        setGeneralError(clerkErrorToMessage(sendErr));
+        return;
+      }
+
+      if (__DEV__) {
+        console.log("[Clerk sign-up] sendEmailCode finished");
+      }
+    } catch (e) {
+      logClerkAuth("signUp (unexpected)", e);
+      setGeneralError(clerkErrorToMessage(e));
+    }
   };
 
   const onVerify = async () => {
+    setGeneralError(null);
     setLocalCodeError(null);
     const codeErr = validateVerificationCode(code);
     if (codeErr) {
@@ -87,23 +122,55 @@ export default function SignUpScreen() {
     }
 
     const digits = code.replace(/\D/g, "");
-    await signUp.verifications.verifyEmailCode({ code: digits });
 
-    if (signUp.status === "complete") {
-      await signUp.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            return;
-          }
-          finishNavigation(decorateUrl);
-        },
+    if (__DEV__) {
+      console.log("[Clerk sign-up] verifying email code");
+    }
+
+    try {
+      const verifyResult = await signUp.verifications.verifyEmailCode({
+        code: digits,
       });
+      const verifyErr =
+        verifyResult &&
+        typeof verifyResult === "object" &&
+        "error" in verifyResult &&
+        (verifyResult as { error?: unknown }).error;
+
+      if (verifyErr) {
+        logClerkAuth("signUp.verifications.verifyEmailCode", verifyErr);
+        setLocalCodeError(clerkErrorToMessage(verifyErr));
+        return;
+      }
+
+      if (signUp.status === "complete") {
+        if (__DEV__) {
+          console.log("[Clerk sign-up] complete, finalizing session");
+        }
+        await signUp.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              if (__DEV__) {
+                console.warn(
+                  "[Clerk sign-up] finalize skipped: session.currentTask set"
+                );
+              }
+              return;
+            }
+            finishNavigation(decorateUrl);
+          },
+        });
+      } else if (__DEV__) {
+        console.warn(
+          "[Clerk sign-up] after verify, status is not complete:",
+          signUp.status
+        );
+      }
+    } catch (e) {
+      logClerkAuth("signUp.verify (unexpected)", e);
+      setLocalCodeError(clerkErrorToMessage(e));
     }
   };
-
-  if (signUp.status === "complete" || isSignedIn) {
-    return <Redirect href="/(tabs)" />;
-  }
 
   const awaitingEmailCode =
     signUp.status === "missing_requirements" &&
@@ -131,6 +198,10 @@ export default function SignUpScreen() {
       !busy
     );
   }, [firstName, lastName, email, password, busy]);
+
+  if (signUp.status === "complete" || isSignedIn) {
+    return <Redirect href="/(tabs)" />;
+  }
 
   if (awaitingEmailCode) {
     return (
@@ -166,6 +237,11 @@ export default function SignUpScreen() {
                 {codeError ? (
                   <Text style={cx("auth-error")}>{codeError}</Text>
                 ) : null}
+                {generalError ? (
+                  <Text style={[cx("auth-error"), { marginTop: 8 }]}>
+                    {generalError}
+                  </Text>
+                ) : null}
               </View>
               <View style={{ marginTop: 24, gap: 10, marginBottom: 24 }}>
                 <Pressable
@@ -179,7 +255,28 @@ export default function SignUpScreen() {
                   <Text style={cx("auth-button-text")}>Verify email</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => signUp.verifications.sendEmailCode()}
+                  onPress={async () => {
+                    setGeneralError(null);
+                    setLocalCodeError(null);
+                    try {
+                      if (__DEV__) {
+                        console.log("[Clerk sign-up] resend email code");
+                      }
+                      const r = await signUp.verifications.sendEmailCode();
+                      const err =
+                        r &&
+                        typeof r === "object" &&
+                        "error" in r &&
+                        (r as { error?: unknown }).error;
+                      if (err) {
+                        logClerkAuth("signUp.resendEmailCode", err);
+                        setGeneralError(clerkErrorToMessage(err));
+                      }
+                    } catch (e) {
+                      logClerkAuth("signUp.resendEmailCode (unexpected)", e);
+                      setGeneralError(clerkErrorToMessage(e));
+                    }
+                  }}
                   disabled={busy}
                   style={cx("auth-secondary-button")}
                 >
@@ -272,6 +369,11 @@ export default function SignUpScreen() {
                 ) : null}
               </View>
             </View>
+            {generalError ? (
+              <Text style={[cx("auth-error"), { marginTop: 12 }]}>
+                {generalError}
+              </Text>
+            ) : null}
             <Pressable
               onPress={onStartSignUp}
               disabled={!canStart}
