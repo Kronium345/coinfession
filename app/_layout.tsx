@@ -5,8 +5,8 @@ import { useFonts } from "expo-font";
 import { initNotificationHandler, notificationsNativeAvailable } from "@/lib/notifications";
 import { SplashScreen, Stack, useRouter } from "expo-router";
 import { PostHogProvider } from "posthog-react-native";
-import { useEffect } from "react";
-import { Platform } from "react-native";
+import { useEffect, useState } from "react";
+import { InteractionManager, Platform } from "react-native";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 
@@ -29,36 +29,39 @@ function NotificationDeepLink() {
     let cancelled = false;
     let subscription: { remove: () => void } | undefined;
 
-    void (async () => {
-      try {
-        const Notifications = await import("expo-notifications");
-        if (cancelled) {
-          return;
-        }
-
-        const open = (n: import("expo-notifications").Notification) => {
-          const url = n.request.content.data?.url;
-          if (typeof url === "string" && url.length > 0) {
-            router.push(url as never);
+    const task = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
+        try {
+          const Notifications = await import("expo-notifications");
+          if (cancelled) {
+            return;
           }
-        };
 
-        const last = await Notifications.getLastNotificationResponseAsync();
-        if (!cancelled && last?.notification) {
-          open(last.notification);
-          void Notifications.clearLastNotificationResponseAsync();
+          const open = (n: import("expo-notifications").Notification) => {
+            const url = n.request.content.data?.url;
+            if (typeof url === "string" && url.length > 0) {
+              router.push(url as never);
+            }
+          };
+
+          const last = await Notifications.getLastNotificationResponseAsync();
+          if (!cancelled && last?.notification) {
+            open(last.notification);
+            void Notifications.clearLastNotificationResponseAsync();
+          }
+
+          subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+            open(response.notification);
+          });
+        } catch {
+          /* Expo Go / missing native module — ignore */
         }
-
-        subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-          open(response.notification);
-        });
-      } catch {
-        /* Expo Go / missing native module — ignore */
-      }
-    })();
+      })();
+    });
 
     return () => {
       cancelled = true;
+      task.cancel();
       subscription?.remove();
     };
   }, [router]);
@@ -67,6 +70,8 @@ function NotificationDeepLink() {
 }
 
 export default function RootLayout() {
+  const [posthogMountReady, setPosthogMountReady] = useState(false);
+
   const [fontsLoaded, fontError] = useFonts({
     "sans-regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
     "sans-medium": require("../assets/fonts/PlusJakartaSans-Medium.ttf"),
@@ -99,6 +104,16 @@ export default function RootLayout() {
     }
   }, [fontsReady]);
 
+  useEffect(() => {
+    if (!fontsReady || Platform.OS === "web") {
+      return;
+    }
+    const task = InteractionManager.runAfterInteractions(() => {
+      setPosthogMountReady(true);
+    });
+    return () => task.cancel();
+  }, [fontsReady]);
+
   const posthogKey = (process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? "").trim();
   const posthogHost = process.env.EXPO_PUBLIC_POSTHOG_HOST;
 
@@ -121,8 +136,20 @@ export default function RootLayout() {
     return tree;
   }
 
+  if (!posthogMountReady) {
+    return tree;
+  }
+
   return (
-    <PostHogProvider apiKey={posthogKey} options={{ host: posthogHost }}>
+    <PostHogProvider
+      apiKey={posthogKey}
+      options={{
+        host: posthogHost,
+        persistence: "memory",
+        captureAppLifecycleEvents: false,
+        enableSessionReplay: false,
+      }}
+    >
       {tree}
     </PostHogProvider>
   );
