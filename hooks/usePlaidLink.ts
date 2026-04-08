@@ -8,7 +8,12 @@ import { useAuth } from "@clerk/expo";
 import * as Application from "expo-application";
 import { useCallback, useState } from "react";
 import { Platform } from "react-native";
-import { create, open, type LinkExit, type LinkSuccess } from "react-native-plaid-link-sdk";
+import type { LinkExit, LinkSuccess } from "react-native-plaid-link-sdk";
+
+/** Load Plaid only when starting Link so LinkKit native code is not touched at tab/screen import time. */
+async function loadPlaidLinkSdk() {
+  return import("react-native-plaid-link-sdk");
+}
 
 export type UsePlaidLinkOptions = {
   onAfterExchange?: () => void;
@@ -34,6 +39,7 @@ export function usePlaidLink(options?: UsePlaidLinkOptions) {
           androidPackageName,
         });
 
+        const { create, open } = await loadPlaidLinkSdk();
         create({ token: linkToken });
 
         open({
@@ -45,9 +51,9 @@ export function usePlaidLink(options?: UsePlaidLinkOptions) {
                 metadata: {
                   institution: success.metadata.institution
                     ? {
-                        institution_id: success.metadata.institution.id,
-                        name: success.metadata.institution.name,
-                      }
+                      institution_id: success.metadata.institution.id,
+                      name: success.metadata.institution.name,
+                    }
                     : undefined,
                   accounts: success.metadata.accounts?.map((a) => ({ id: a.id })),
                 },
