@@ -4,7 +4,6 @@ import { getCurrencyNarrowSymbol } from "@/lib/utils";
 import clsx from "clsx";
 import { toast } from "burnt";
 import dayjs from "dayjs";
-import { usePostHog } from "posthog-react-native";
 import { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -64,7 +63,6 @@ export default function CreateSubscriptionModal({
   defaultCurrency = "USD",
 }: CreateSubscriptionModalProps) {
   const insets = useSafeAreaInsets();
-  const posthog = usePostHog();
   const [name, setName] = useState("");
   const [priceText, setPriceText] = useState("");
   const [frequency, setFrequency] = useState<"Monthly" | "Yearly">("Monthly");
@@ -133,12 +131,6 @@ export default function CreateSubscriptionModal({
 
     try {
       await onCreate(subscription);
-      posthog.capture("subscription_created", {
-        subscription_name: subscription.name,
-        subscription_price: subscription.price,
-        subscription_frequency: subscription.billing,
-        subscription_category: subscription.category ?? "Other",
-      });
       toast({
         title: "Subscription added",
         preset: "done",

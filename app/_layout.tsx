@@ -4,8 +4,7 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
 import { initNotificationHandler, notificationsNativeAvailable } from "@/lib/notifications";
 import { SplashScreen, Stack, useRouter } from "expo-router";
-import { PostHogProvider } from "posthog-react-native";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { InteractionManager, Platform } from "react-native";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
@@ -70,8 +69,6 @@ function NotificationDeepLink() {
 }
 
 export default function RootLayout() {
-  const [posthogMountReady, setPosthogMountReady] = useState(false);
-
   const [fontsLoaded, fontError] = useFonts({
     "sans-regular": require("../assets/fonts/PlusJakartaSans-Regular.ttf"),
     "sans-medium": require("../assets/fonts/PlusJakartaSans-Medium.ttf"),
@@ -104,20 +101,7 @@ export default function RootLayout() {
     }
   }, [fontsReady]);
 
-  useEffect(() => {
-    if (!fontsReady || Platform.OS === "web") {
-      return;
-    }
-    const task = InteractionManager.runAfterInteractions(() => {
-      setPosthogMountReady(true);
-    });
-    return () => task.cancel();
-  }, [fontsReady]);
-
-  const posthogKey = (process.env.EXPO_PUBLIC_POSTHOG_API_KEY ?? "").trim();
-  const posthogHost = process.env.EXPO_PUBLIC_POSTHOG_HOST;
-
-  const tree = (
+  return (
     <ClerkProvider
       publishableKey={publishableKey}
       tokenCache={tokenCache}
@@ -130,27 +114,5 @@ export default function RootLayout() {
         </>
       ) : null}
     </ClerkProvider>
-  );
-
-  if (!posthogKey) {
-    return tree;
-  }
-
-  if (!posthogMountReady) {
-    return tree;
-  }
-
-  return (
-    <PostHogProvider
-      apiKey={posthogKey}
-      options={{
-        host: posthogHost,
-        persistence: "memory",
-        captureAppLifecycleEvents: false,
-        enableSessionReplay: false,
-      }}
-    >
-      {tree}
-    </PostHogProvider>
   );
 }

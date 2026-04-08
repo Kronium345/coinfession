@@ -11,7 +11,6 @@ import { cx } from "@/lib/tw";
 import { tabBarScrollPaddingBottom } from "@/lib/tabBarScrollPadding";
 import { usePlaidLink } from "@/hooks/usePlaidLink";
 import { useAuth, useClerk, useUser } from "@clerk/expo";
-import { usePostHog } from "posthog-react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -33,7 +32,6 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const getTokenRef = useRef(getToken);
   const hasBootstrappedRef = useRef(false);
-  const posthog = usePostHog();
   const {
     renewalRemindersEnabled,
     setRenewalRemindersEnabled,
@@ -102,21 +100,9 @@ export default function SettingsScreen() {
   }, [refreshConnections, refreshInsightsMeta]);
 
   const handleLogout = async () => {
-    posthog.capture("logout_clicked", {
-      source: "settings",
-      has_user: Boolean(user?.id),
-    });
-
     try {
       await signOut();
-      posthog.capture("logout_success", {
-        source: "settings",
-      });
     } catch (error) {
-      posthog.capture("logout_failed", {
-        source: "settings",
-        message: error instanceof Error ? error.message : "Unknown sign out error",
-      });
       throw error;
     }
   };
