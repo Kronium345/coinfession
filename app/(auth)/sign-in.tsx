@@ -5,9 +5,13 @@ import {
   validatePassword,
   validateVerificationCode,
 } from "@/lib/auth-validation";
-import { clerkErrorToMessage, logClerkAuth } from "@/lib/clerkErrors";
+import {
+  clerkErrorToMessage,
+  isClerkAlreadySignedInError,
+  logClerkAuth,
+} from "@/lib/clerkErrors";
 import { cx } from "@/lib/tw";
-import { useAuth, useSignIn } from "@clerk/expo";
+import { useAuth, useClerk, useSignIn } from "@clerk/expo";
 import { type Href, Link, Redirect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -24,6 +28,7 @@ import { colors } from "../../theme";
 
 export default function SignInScreen() {
   const { isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const { signIn, errors, fetchStatus } = useSignIn();
   const router = useRouter();
 
@@ -59,32 +64,60 @@ export default function SignInScreen() {
     if (!isValidEmail(email)) {
       const msg = "Enter a valid email address.";
       setLocalEmailError(msg);
-      setGeneralError(msg);
       return;
     }
     const pwErr = validatePassword(password);
     if (pwErr) {
       setLocalPasswordError(pwErr);
-      setGeneralError(pwErr);
       return;
     }
 
-    try {
-      const { error } = await signIn.password({
-        emailAddress: email.trim(),
-        password,
-      });
+    const creds = { emailAddress: email.trim(), password };
+    const runPasswordAttempt = async () => {
+      signIn.reset();
+      return signIn.password(creds);
+    };
 
-      if (error) {
-        const msg = clerkErrorToMessage(error);
-        setGeneralError(msg);
-        logClerkAuth("sign-in.password", error);
+    let passwordErr: Awaited<
+      ReturnType<typeof signIn.password>
+    >["error"];
+
+    try {
+      let attempt = await runPasswordAttempt();
+      if (attempt.error && isClerkAlreadySignedInError(attempt.error)) {
+        try {
+          await signOut();
+        } catch {
+          /* stale session; still retry sign-in */
+        }
+        attempt = await runPasswordAttempt();
+      }
+      passwordErr = attempt.error;
+    } catch (error) {
+      if (isClerkAlreadySignedInError(error)) {
+        try {
+          await signOut();
+        } catch {
+          /* ignore */
+        }
+        try {
+          const attempt = await runPasswordAttempt();
+          passwordErr = attempt.error;
+        } catch (err2) {
+          setGeneralError(clerkErrorToMessage(err2));
+          logClerkAuth("sign-in.password.throw", err2);
+          return;
+        }
+      } else {
+        setGeneralError(clerkErrorToMessage(error));
+        logClerkAuth("sign-in.password.throw", error);
         return;
       }
-    } catch (error) {
-      const msg = clerkErrorToMessage(error);
-      setGeneralError(msg);
-      logClerkAuth("sign-in.password.throw", error);
+    }
+
+    if (passwordErr) {
+      setLocalPasswordError(clerkErrorToMessage(passwordErr));
+      logClerkAuth("sign-in.password", passwordErr);
       return;
     }
 
@@ -159,11 +192,8 @@ export default function SignInScreen() {
   const emailError = localEmailError ?? clerkIdentifierError;
   const passwordError = localPasswordError ?? clerkPasswordError;
   const codeError = localCodeError ?? clerkCodeError;
-  const visibleGeneralError =
-    generalError ??
-    (clerkIdentifierError || clerkPasswordError || clerkCodeError
-      ? "Sign in failed. Check your details and try again."
-      : null);
+  /** Field-level Clerk errors render under inputs; avoid a second banner with the same text. */
+  const visibleGeneralError = generalError;
 
   if (needsTrust) {
     return (

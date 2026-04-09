@@ -5,9 +5,13 @@ import {
   validatePassword,
   validateVerificationCode,
 } from "@/lib/auth-validation";
-import { clerkErrorToMessage, logClerkAuth } from "@/lib/clerkErrors";
+import {
+  clerkErrorToMessage,
+  isClerkAlreadySignedInError,
+  logClerkAuth,
+} from "@/lib/clerkErrors";
 import { cx } from "@/lib/tw";
-import { useAuth, useSignUp } from "@clerk/expo";
+import { useAuth, useClerk, useSignUp } from "@clerk/expo";
 import { type Href, Link, Redirect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -22,8 +26,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../../theme";
 
+function verificationResultError(result: unknown): unknown | undefined {
+  if (result && typeof result === "object" && "error" in result) {
+    return (result as { error?: unknown }).error;
+  }
+  return undefined;
+}
+
 export default function SignUpScreen() {
   const { isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const { signUp, errors, fetchStatus } = useSignUp();
   const router = useRouter();
 
@@ -80,43 +92,114 @@ export default function SignUpScreen() {
       console.log("[Clerk sign-up] calling signUp.password()");
     }
 
-    try {
-      const { error: passwordError } = await signUp.password({
-        emailAddress: email.trim(),
-        password,
-        firstName: firstName.trim() || undefined,
-        lastName: lastName.trim() || undefined,
-      });
+    const signUpPayload = {
+      emailAddress: email.trim(),
+      password,
+      firstName: firstName.trim() || undefined,
+      lastName: lastName.trim() || undefined,
+    };
 
-      if (passwordError) {
-        logClerkAuth("signUp.password", passwordError);
-        setGeneralError(clerkErrorToMessage(passwordError));
+    const runPasswordAttempt = async () => {
+      signUp.reset();
+      return signUp.password(signUpPayload);
+    };
+
+    let passwordErr: Awaited<
+      ReturnType<typeof signUp.password>
+    >["error"];
+
+    try {
+      let attempt = await runPasswordAttempt();
+      if (attempt.error && isClerkAlreadySignedInError(attempt.error)) {
+        try {
+          await signOut();
+        } catch {
+          /* stale session; retry sign-up */
+        }
+        attempt = await runPasswordAttempt();
+      }
+      passwordErr = attempt.error;
+    } catch (e) {
+      if (isClerkAlreadySignedInError(e)) {
+        try {
+          await signOut();
+        } catch {
+          /* ignore */
+        }
+        try {
+          const attempt = await runPasswordAttempt();
+          passwordErr = attempt.error;
+        } catch (err2) {
+          logClerkAuth("signUp (unexpected)", err2);
+          setGeneralError(clerkErrorToMessage(err2));
+          return;
+        }
+      } else {
+        logClerkAuth("signUp (unexpected)", e);
+        setGeneralError(clerkErrorToMessage(e));
         return;
       }
+    }
 
-      if (__DEV__) {
-        console.log("[Clerk sign-up] password OK, sending email code");
+    if (passwordErr) {
+      logClerkAuth("signUp.password", passwordErr);
+      setGeneralError(clerkErrorToMessage(passwordErr));
+      return;
+    }
+
+    if (__DEV__) {
+      console.log("[Clerk sign-up] password OK, sending email code");
+    }
+
+    const sendEmailOnce = () => signUp.verifications.sendEmailCode();
+
+    try {
+      let sendResult = await sendEmailOnce();
+      let sendErr = verificationResultError(sendResult);
+      if (sendErr && isClerkAlreadySignedInError(sendErr)) {
+        try {
+          await signOut();
+        } catch {
+          /* ignore */
+        }
+        sendResult = await sendEmailOnce();
+        sendErr = verificationResultError(sendResult);
       }
-
-      const sendResult = await signUp.verifications.sendEmailCode();
-      const sendErr =
-        sendResult &&
-        typeof sendResult === "object" &&
-        "error" in sendResult &&
-        (sendResult as { error?: unknown }).error;
 
       if (sendErr) {
         logClerkAuth("signUp.verifications.sendEmailCode", sendErr);
         setGeneralError(clerkErrorToMessage(sendErr));
         return;
       }
-
-      if (__DEV__) {
-        console.log("[Clerk sign-up] sendEmailCode finished");
-      }
     } catch (e) {
-      logClerkAuth("signUp (unexpected)", e);
-      setGeneralError(clerkErrorToMessage(e));
+      if (isClerkAlreadySignedInError(e)) {
+        try {
+          await signOut();
+        } catch {
+          /* ignore */
+        }
+        try {
+          const sendResult = await sendEmailOnce();
+          const sendErr = verificationResultError(sendResult);
+          if (sendErr) {
+            logClerkAuth("signUp.verifications.sendEmailCode", sendErr);
+            setGeneralError(clerkErrorToMessage(sendErr));
+            return;
+          }
+        } catch (err2) {
+          logClerkAuth("signUp (unexpected)", err2);
+          setGeneralError(clerkErrorToMessage(err2));
+          return;
+        }
+      } else {
+        logClerkAuth("signUp (unexpected)", e);
+        setGeneralError(clerkErrorToMessage(e));
+        return;
+      }
+    }
+
+    if (__DEV__) {
+      console.log("[Clerk sign-up] sendEmailCode finished");
     }
   };
 
@@ -135,15 +218,21 @@ export default function SignUpScreen() {
       console.log("[Clerk sign-up] verifying email code");
     }
 
+    const verifyOnce = () =>
+      signUp.verifications.verifyEmailCode({ code: digits });
+
     try {
-      const verifyResult = await signUp.verifications.verifyEmailCode({
-        code: digits,
-      });
-      const verifyErr =
-        verifyResult &&
-        typeof verifyResult === "object" &&
-        "error" in verifyResult &&
-        (verifyResult as { error?: unknown }).error;
+      let verifyResult = await verifyOnce();
+      let verifyErr = verificationResultError(verifyResult);
+      if (verifyErr && isClerkAlreadySignedInError(verifyErr)) {
+        try {
+          await signOut();
+        } catch {
+          /* ignore */
+        }
+        verifyResult = await verifyOnce();
+        verifyErr = verificationResultError(verifyResult);
+      }
 
       if (verifyErr) {
         logClerkAuth("signUp.verifications.verifyEmailCode", verifyErr);
@@ -175,6 +264,36 @@ export default function SignUpScreen() {
         );
       }
     } catch (e) {
+      if (isClerkAlreadySignedInError(e)) {
+        try {
+          await signOut();
+        } catch {
+          /* ignore */
+        }
+        try {
+          const verifyResult = await verifyOnce();
+          const verifyErr = verificationResultError(verifyResult);
+          if (verifyErr) {
+            logClerkAuth("signUp.verifications.verifyEmailCode", verifyErr);
+            setLocalCodeError(clerkErrorToMessage(verifyErr));
+            return;
+          }
+          if (signUp.status === "complete") {
+            await signUp.finalize({
+              navigate: ({ session, decorateUrl }) => {
+                if (session?.currentTask) {
+                  return;
+                }
+                finishNavigation(decorateUrl);
+              },
+            });
+          }
+        } catch (err2) {
+          logClerkAuth("signUp.verify (unexpected)", err2);
+          setLocalCodeError(clerkErrorToMessage(err2));
+        }
+        return;
+      }
       logClerkAuth("signUp.verify (unexpected)", e);
       setLocalCodeError(clerkErrorToMessage(e));
     }
@@ -256,21 +375,54 @@ export default function SignUpScreen() {
                   onPress={async () => {
                     setGeneralError(null);
                     setLocalCodeError(null);
+                    const resendOnce = () =>
+                      signUp.verifications.sendEmailCode();
+
+                    const handleSendErr = (err: unknown) => {
+                      logClerkAuth("signUp.resendEmailCode", err);
+                      setGeneralError(clerkErrorToMessage(err));
+                    };
+
                     try {
                       if (__DEV__) {
                         console.log("[Clerk sign-up] resend email code");
                       }
-                      const r = await signUp.verifications.sendEmailCode();
-                      const err =
-                        r &&
-                        typeof r === "object" &&
-                        "error" in r &&
-                        (r as { error?: unknown }).error;
+                      let r = await resendOnce();
+                      let err = verificationResultError(r);
+                      if (err && isClerkAlreadySignedInError(err)) {
+                        try {
+                          await signOut();
+                        } catch {
+                          /* ignore */
+                        }
+                        r = await resendOnce();
+                        err = verificationResultError(r);
+                      }
                       if (err) {
-                        logClerkAuth("signUp.resendEmailCode", err);
-                        setGeneralError(clerkErrorToMessage(err));
+                        handleSendErr(err);
                       }
                     } catch (e) {
+                      if (isClerkAlreadySignedInError(e)) {
+                        try {
+                          await signOut();
+                        } catch {
+                          /* ignore */
+                        }
+                        try {
+                          const r = await resendOnce();
+                          const err = verificationResultError(r);
+                          if (err) {
+                            handleSendErr(err);
+                          }
+                        } catch (err2) {
+                          logClerkAuth(
+                            "signUp.resendEmailCode (unexpected)",
+                            err2
+                          );
+                          setGeneralError(clerkErrorToMessage(err2));
+                        }
+                        return;
+                      }
                       logClerkAuth("signUp.resendEmailCode (unexpected)", e);
                       setGeneralError(clerkErrorToMessage(e));
                     }

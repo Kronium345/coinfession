@@ -38,6 +38,49 @@ function isNetworkFailure(error: unknown): boolean {
   return code === "network_error";
 }
 
+/**
+ * Clerk sometimes blocks `signIn.password` when a session is still active in the
+ * native client while `useAuth().isSignedIn` is false (stale state). Recover by
+ * signing out and retrying once.
+ */
+export function isClerkAlreadySignedInError(error: unknown): boolean {
+  if (error == null) {
+    return false;
+  }
+  if (isClerkRuntimeError(error)) {
+    const code =
+      typeof (error as { code?: unknown }).code === "string"
+        ? (error as { code: string }).code
+        : "";
+    if (code === "already_signed_in") {
+      return true;
+    }
+  }
+  if (isClerkAPIResponseError(error)) {
+    const codes =
+      error.errors?.map((e) => e.code).filter(Boolean).map(String) ?? [];
+    if (
+      codes.some((c) =>
+        /^(session_exists|client_session_already_exists|already_signed_in)$/i.test(
+          c
+        )
+      )
+    ) {
+      return true;
+    }
+  }
+  const raw =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : clerkErrorToMessage(error);
+  const msg = raw.toLowerCase();
+  return (
+    msg.includes("already signed in") || msg.includes("already signed")
+  );
+}
+
 /** User-visible message from a Clerk `error` object or thrown value. */
 export function clerkErrorToMessage(error: unknown): string {
   if (error == null) {
