@@ -14,8 +14,10 @@ export async function clearClerkSecureStorage(
   if (Platform.OS === "web") {
     return;
   }
-  const suffix =
+  // SecureStore keys allow only [A-Za-z0-9._-]; sanitize to prevent invalid-key exceptions.
+  const rawSuffix =
     publishableKey.length >= 5 ? publishableKey.slice(-5) : publishableKey;
+  const suffix = rawSuffix.replace(/[^A-Za-z0-9._-]/g, "");
   const keys = new Set<string>([CLERK_CLIENT_JWT_KEY]);
   if (suffix) {
     keys.add(`__clerk_cache_session_jwt_${suffix}`);

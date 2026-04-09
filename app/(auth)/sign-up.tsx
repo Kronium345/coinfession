@@ -9,7 +9,7 @@ import { clerkErrorToMessage, logClerkAuth } from "@/lib/clerkErrors";
 import { cx } from "@/lib/tw";
 import { useAuth, useSignUp } from "@clerk/expo";
 import { type Href, Link, Redirect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -58,13 +58,21 @@ export default function SignUpScreen() {
     setLocalEmailError(null);
     setLocalPasswordError(null);
 
+    if (!firstName.trim() || !lastName.trim()) {
+      setGeneralError("Enter your first and last name.");
+      return;
+    }
+
     if (!isValidEmail(email)) {
-      setLocalEmailError("Enter a valid email address.");
+      const msg = "Enter a valid email address.";
+      setLocalEmailError(msg);
+      setGeneralError(msg);
       return;
     }
     const pwErr = validatePassword(password);
     if (pwErr) {
       setLocalPasswordError(pwErr);
+      setGeneralError(pwErr);
       return;
     }
 
@@ -188,16 +196,6 @@ export default function SignUpScreen() {
   const emailError = localEmailError ?? clerkEmailError;
   const passwordError = localPasswordError ?? clerkPasswordError;
   const codeError = localCodeError ?? clerkCodeError;
-
-  const canStart = useMemo(() => {
-    return (
-      firstName.trim().length > 0 &&
-      lastName.trim().length > 0 &&
-      email.trim().length > 0 &&
-      password.length >= PASSWORD_MIN_LENGTH &&
-      !busy
-    );
-  }, [firstName, lastName, email, password, busy]);
 
   if (signUp.status === "complete" || isSignedIn) {
     return <Redirect href="/(tabs)" />;
@@ -376,11 +374,11 @@ export default function SignUpScreen() {
             ) : null}
             <Pressable
               onPress={onStartSignUp}
-              disabled={!canStart}
+              disabled={busy}
               style={({ pressed }) => [
-                cx("auth-button", (!canStart || busy) && "auth-button-disabled"),
+                cx("auth-button", busy && "auth-button-disabled"),
                 { marginTop: 24, marginBottom: 20 },
-                pressed && canStart && !busy ? { opacity: 0.92 } : null,
+                pressed && !busy ? { opacity: 0.92 } : null,
               ]}
             >
               <Text style={cx("auth-button-text")}>Continue</Text>

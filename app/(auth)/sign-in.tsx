@@ -5,10 +5,11 @@ import {
   validatePassword,
   validateVerificationCode,
 } from "@/lib/auth-validation";
+import { clerkErrorToMessage, logClerkAuth } from "@/lib/clerkErrors";
 import { cx } from "@/lib/tw";
 import { useAuth, useSignIn } from "@clerk/expo";
 import { type Href, Link, Redirect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -34,6 +35,7 @@ export default function SignInScreen() {
     null
   );
   const [localCodeError, setLocalCodeError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const busy = fetchStatus === "fetching";
 
@@ -50,25 +52,39 @@ export default function SignInScreen() {
   );
 
   const onSubmit = async () => {
+    setGeneralError(null);
     setLocalEmailError(null);
     setLocalPasswordError(null);
 
     if (!isValidEmail(email)) {
-      setLocalEmailError("Enter a valid email address.");
+      const msg = "Enter a valid email address.";
+      setLocalEmailError(msg);
+      setGeneralError(msg);
       return;
     }
     const pwErr = validatePassword(password);
     if (pwErr) {
       setLocalPasswordError(pwErr);
+      setGeneralError(pwErr);
       return;
     }
 
-    const { error } = await signIn.password({
-      emailAddress: email.trim(),
-      password,
-    });
+    try {
+      const { error } = await signIn.password({
+        emailAddress: email.trim(),
+        password,
+      });
 
-    if (error) {
+      if (error) {
+        const msg = clerkErrorToMessage(error);
+        setGeneralError(msg);
+        logClerkAuth("sign-in.password", error);
+        return;
+      }
+    } catch (error) {
+      const msg = clerkErrorToMessage(error);
+      setGeneralError(msg);
+      logClerkAuth("sign-in.password.throw", error);
       return;
     }
 
@@ -96,14 +112,23 @@ export default function SignInScreen() {
 
   const onVerifyTrust = async () => {
     setLocalCodeError(null);
+    setGeneralError(null);
     const codeErr = validateVerificationCode(trustCode);
     if (codeErr) {
       setLocalCodeError(codeErr);
+      setGeneralError(codeErr);
       return;
     }
 
     const digits = trustCode.replace(/\D/g, "");
-    await signIn.mfa.verifyEmailCode({ code: digits });
+    try {
+      await signIn.mfa.verifyEmailCode({ code: digits });
+    } catch (error) {
+      const msg = clerkErrorToMessage(error);
+      setGeneralError(msg);
+      logClerkAuth("sign-in.verifyEmailCode", error);
+      return;
+    }
 
     if (signIn.status === "complete") {
       await signIn.finalize({
@@ -134,14 +159,11 @@ export default function SignInScreen() {
   const emailError = localEmailError ?? clerkIdentifierError;
   const passwordError = localPasswordError ?? clerkPasswordError;
   const codeError = localCodeError ?? clerkCodeError;
-
-  const canSubmitSignIn = useMemo(() => {
-    return (
-      email.trim().length > 0 &&
-      password.length >= PASSWORD_MIN_LENGTH &&
-      !busy
-    );
-  }, [email, password, busy]);
+  const visibleGeneralError =
+    generalError ??
+    (clerkIdentifierError || clerkPasswordError || clerkCodeError
+      ? "Sign in failed. Check your details and try again."
+      : null);
 
   if (needsTrust) {
     return (
@@ -161,6 +183,11 @@ export default function SignInScreen() {
               signing in securely.
             </Text>
             <View style={cx("auth-card")}>
+              {visibleGeneralError ? (
+                <Text style={[cx("auth-error"), { marginBottom: 12 }]}>
+                  {visibleGeneralError}
+                </Text>
+              ) : null}
               <View style={cx("auth-field")}>
                 <Text style={cx("auth-label")}>Verification code</Text>
                 <TextInput
@@ -226,6 +253,11 @@ export default function SignInScreen() {
             Sign in to keep renewals, totals, and due dates in one calm place.
           </Text>
           <View style={cx("auth-card")}>
+            {visibleGeneralError ? (
+              <Text style={[cx("auth-error"), { marginBottom: 12 }]}>
+                {visibleGeneralError}
+              </Text>
+            ) : null}
             <View style={cx("auth-form")}>
               <View style={cx("auth-field")}>
                 <Text style={cx("auth-label")}>Email</Text>
@@ -266,14 +298,14 @@ export default function SignInScreen() {
             </View>
             <Pressable
               onPress={onSubmit}
-              disabled={!canSubmitSignIn}
+              disabled={busy}
               style={({ pressed }) => [
                 cx(
                   "auth-button",
-                  (!canSubmitSignIn || busy) && "auth-button-disabled"
+                  busy && "auth-button-disabled"
                 ),
                 { marginTop: 24, marginBottom: 20 },
-                pressed && canSubmitSignIn && !busy ? { opacity: 0.92 } : null,
+                pressed && !busy ? { opacity: 0.92 } : null,
               ]}
             >
               <Text style={cx("auth-button-text")}>Sign in</Text>
